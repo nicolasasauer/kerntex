@@ -36,8 +36,10 @@ const WELCOME_FILES: &[(&str, &[u8])] = &[
     ("images/example.png", include_bytes!("../../templates/welcome/images/example.png")),
 ];
 
+/// Only build output is ignored; `.kerntex/project.json` (main file, engine)
+/// is meant to be committed so it travels with the project.
 fn gitignore() -> String {
-    format!("{BUILD_DIR}/\n")
+    format!("{BUILD_DIR}/out/\n")
 }
 
 fn check_name(name: &str) -> Result<&str> {
@@ -105,7 +107,7 @@ mod tests {
 
         let p = new_project(&base, "Thesis", Template::Report).unwrap();
         assert!(fs::read_to_string(p.join("main.tex")).unwrap().contains("{report}"));
-        assert_eq!(fs::read_to_string(p.join(".gitignore")).unwrap(), ".kerntex/\n");
+        assert_eq!(fs::read_to_string(p.join(".gitignore")).unwrap(), ".kerntex/out/\n");
         assert!(new_project(&base, "Thesis", Template::Blank).is_err(), "never overwrite");
         assert!(new_project(&base, "a/b", Template::Blank).is_err());
         assert!(new_project(&base, "..", Template::Blank).is_err());

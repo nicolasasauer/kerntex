@@ -36,6 +36,8 @@ KernTeX works on ordinary folders — there's no special project format.
 - **Back to Overleaf:** *Export project as ZIP* and upload it as a new project.
 - **For arXiv and journals:** *Export clean ZIP* leaves out auxiliary files but keeps the `.bbl`.
 
+Per-project choices (main file, engine) are stored in `.kerntex/project.json` — commit it so they travel with the project via Git. Build output in `.kerntex/out/` is git-ignored in new projects.
+
 ## Use your own TeX distribution
 
 Prefer TeX Live or MiKTeX? Open **Settings → Default engine → latexmk** and pick pdfLaTeX, XeLaTeX or LuaLaTeX — or set it per project. Projects with a `latexmkrc` use latexmk automatically. If a package is missing, KernTeX shows the `tlmgr install …` command, a MiKTeX hint, or offers to switch that project to Tectonic.
