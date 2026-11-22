@@ -105,10 +105,13 @@ pub async fn new_project(parent: String, name: String, template: Template) -> Re
 /// Creates (or reuses) the example project in the user's Documents folder.
 #[tauri::command]
 pub async fn welcome_project(app: AppHandle, fresh: bool) -> Result<String> {
-    let docs = app
-        .path()
+    let paths = app.path();
+    let docs = paths
         .document_dir()
-        .or_else(|_| app.path().home_dir())
+        .or_else(|_| {
+            // No XDG user-dirs config (minimal Linux setups): ~/Documents if present, else ~.
+            paths.home_dir().map(|h| if h.join("Documents").is_dir() { h.join("Documents") } else { h })
+        })
         .map_err(|e| AppError::new(ErrorSource::FileSystem, "Couldn't find your Documents folder").detail(e.to_string()))?;
     blocking(move || templates::ensure_welcome(&docs, fresh).map(|p| p.display().to_string())).await
 }

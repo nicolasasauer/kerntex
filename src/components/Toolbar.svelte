@@ -103,6 +103,8 @@
         {/if}
       {/if}
     </div>
+  {:else}
+    <div class="center"></div>
   {/if}
 
   <div class="right">

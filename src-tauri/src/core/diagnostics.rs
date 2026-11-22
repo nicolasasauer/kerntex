@@ -83,6 +83,10 @@ pub fn parse_tex_log(log: &str) -> Vec<Diagnostic> {
 
         // `./main.tex:12: Undefined control sequence.`
         if let Some((file, ln, msg)) = split_file_line(line) {
+            if is_tex_noise(msg) {
+                i += 1;
+                continue;
+            }
             let mut message = msg.trim_end_matches('.').to_string();
             // Append the offending source snippet (`l.12 \foo`) when present.
             if let Some(ctx) = lines[i + 1..].iter().take(8).find(|l| l.starts_with(&format!("l.{ln} "))) {
@@ -124,8 +128,11 @@ pub fn parse_tex_log(log: &str) -> Vec<Diagnostic> {
             }
             let ln = extract_input_line(&message);
             let message = strip_input_line(&message);
-            let severity =
-                if message.contains("may have changed") || message.contains("Rerun") { Severity::Info } else { Severity::Warning };
+            let severity = if ["may have changed", "Rerun", "fall-back bibtex backend"].iter().any(|k| message.contains(k)) {
+                Severity::Info
+            } else {
+                Severity::Warning
+            };
             push(&mut out, severity, source, files.current(), ln, message);
             files.scan(line);
             i = j;
@@ -272,8 +279,10 @@ fn is_tectonic_noise(msg: &str) -> bool {
         || msg.starts_with("an error occurred while processing")
 }
 
+/// Follow-up messages that only repeat that TeX gave up after a real error.
 fn is_tex_noise(msg: &str) -> bool {
-    msg.starts_with("Emergency stop") || msg.starts_with("==> Fatal error") || msg.starts_with(" ==> Fatal error")
+    let m = msg.trim_start();
+    m.starts_with("Emergency stop") || m.starts_with("==> Fatal error") || m.starts_with("*** (job aborted")
 }
 
 fn is_network_error(m: &str) -> bool {
@@ -351,6 +360,8 @@ pub fn hint_for(msg: &str) -> Option<String> {
         "\\\\ or \\newline is used where there is no line, e.g. right after a paragraph break. Remove it, or use \\vspace{…} for extra space.".to_string()
     } else if m.contains("Float(s) lost") || m.contains("Not in outer par mode") {
         "A figure or table is placed somewhere floats aren't allowed (e.g. inside a minipage or another float). Move it out, or use [H] from the float package.".to_string()
+    } else if m.contains("fall-back bibtex backend") {
+        "biblatex uses BibTeX instead of Biber here. That's fine for most documents (and what the built-in Tectonic engine supports); install Biber and remove `backend=bibtex` if you need Biber-only features.".to_string()
     } else if m.contains("Label(s) may have changed") || m.contains("Rerun") {
         "Cross-references changed. KernTeX re-runs automatically; if it persists, compile once more.".to_string()
     } else if m.contains("I didn't find a database entry") {
@@ -484,6 +495,17 @@ mod tests {
         assert_eq!(d[0].severity, Severity::Error);
         assert_eq!(d[0].source, "Biber");
         assert!(d[0].hint.as_deref().unwrap().contains(".bib file couldn't be found"));
+    }
+
+    #[test]
+    fn missing_package_without_noise() {
+        // Real pdfLaTeX log excerpt (-file-line-error).
+        let log = "(./main.tex\nLaTeX2e <2023-11-01>\n! LaTeX Error: File `nonexistentpkg.sty' not found.\n\nType X to quit or <RETURN> to proceed,\nor enter new name. (Default extension: sty)\n\nEnter file name: \n./main.tex:3: Emergency stop.\n<read *> \n         \nl.3 \\begin\n             {document}\n*** (cannot \\read from terminal in nonstop modes)\n\n./main.tex:3:  ==> Fatal error occurred, no output PDF file produced!\n";
+        let d = parse_tex_log(log);
+        assert_eq!(d.len(), 1, "{d:?}");
+        assert!(d[0].message.contains("nonexistentpkg.sty"));
+        assert_eq!(d[0].file.as_deref(), Some("main.tex"));
+        assert_eq!(d[0].line, Some(3));
     }
 
     #[test]

@@ -44,6 +44,11 @@
     ws.compile();
   }
 
+  async function switchToLatexmk() {
+    await ws.updateProjectSettings({ engine: "latexmk" });
+    ws.compile();
+  }
+
   function toggle() {
     L.problemsOpen = !L.problemsOpen;
   }
@@ -97,6 +102,15 @@
                   <span class="src">{d.source}</span>
                   {#if d.file}<span class="loc">{d.file}{#if d.line}:{d.line}{/if}</span>{/if}
                 </button>
+                {#if d.message.startsWith("Tectonic wasn't found") && ws.engines?.latexmk}
+                  <div class="pkg-card">
+                    <p>latexmk from your TeX distribution is available.</p>
+                    <div class="pkg-actions">
+                      <button class="btn primary" onclick={switchToLatexmk}>Use latexmk for this project</button>
+                      <button class="btn" onclick={() => { settings.engine = "latexmk"; ws.compile(); }}>Use latexmk for all projects</button>
+                    </div>
+                  </div>
+                {/if}
                 {#if pkg}
                   <div class="pkg-card">
                     <div class="pkg-head"><Package size={15} /> <b>{pkg.file}</b> is missing</div>
