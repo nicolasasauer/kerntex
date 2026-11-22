@@ -117,8 +117,12 @@ fn tectonic_cache_dir() -> Option<PathBuf> {
     }
 }
 
-/// Bundled sidecar next to the executable first, then `PATH`.
+/// `KERNTEX_TECTONIC` (explicit override), then the bundled sidecar next to
+/// the executable, then `PATH`.
 pub fn find_tectonic() -> Option<PathBuf> {
+    if let Some(p) = std::env::var_os("KERNTEX_TECTONIC").map(PathBuf::from).filter(|p| p.is_file()) {
+        return Some(p);
+    }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let p = dir.join(exe_name("tectonic"));
@@ -539,5 +543,41 @@ mod tests {
         assert!(res.canceled && !res.ok);
         assert!(!handle.is_running());
         std::fs::remove_dir_all(root).ok();
+    }
+
+    /// The bundled engine must build the welcome project (runs where Tectonic
+    /// is available, e.g. in CI after `npm run setup:tectonic`).
+    #[test]
+    fn tectonic_compiles_welcome() {
+        if find_tectonic().is_none() {
+            eprintln!("Tectonic not found (set KERNTEX_TECTONIC); skipping");
+            return;
+        }
+        let base = std::env::temp_dir().join(format!("kerntex-e2e-tectonic-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        let root = crate::core::templates::ensure_welcome(&base, false).unwrap();
+        let req = CompileRequest {
+            root: root.display().to_string(),
+            main_file: "main.tex".into(),
+            engine: Engine::Tectonic,
+            flavor: TexFlavor::Pdflatex,
+        };
+        let mut stages = vec![];
+        let res = compile(&req, &CancelHandle::default(), |p| stages.push(p.stage)).unwrap();
+        let errors: Vec<_> = res.diagnostics.iter().filter(|d| d.severity == Severity::Error).collect();
+        assert!(res.ok && res.pdf_path.is_some(), "{errors:?}\n{}", res.log);
+        assert!(stages.iter().any(|s| s.starts_with("Typesetting")), "{stages:?}");
+        let undefined: Vec<_> = res.diagnostics.iter().filter(|d| d.message.contains("undefined")).collect();
+        assert!(undefined.is_empty(), "unresolved refs/citations: {undefined:?}");
+
+        // A broken document reports file, line and a hint.
+        project::write_text(&root, "broken.tex", "\\documentclass{article}\n\\begin{document}\nx \\foo y\n\\end{document}\n").unwrap();
+        let req = CompileRequest { main_file: "broken.tex".into(), ..req };
+        let res = compile(&req, &CancelHandle::default(), |_| {}).unwrap();
+        let err = res.diagnostics.iter().find(|d| d.severity == Severity::Error).expect("an error");
+        assert_eq!((err.file.as_deref(), err.line), (Some("broken.tex"), Some(3)), "{:?}", res.diagnostics);
+        assert!(err.hint.is_some());
+        std::fs::remove_dir_all(base).ok();
     }
 }
