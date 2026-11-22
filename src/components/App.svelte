@@ -35,6 +35,8 @@
 
   onMount(() => {
     ws.init();
+    // Dev-only handle for automated UI checks (stripped from production builds).
+    if (import.meta.env.DEV) (window as unknown as { __kerntex: unknown }).__kerntex = ws;
     let unlisten: (() => void) | undefined;
     if (isTauri) {
       import("@tauri-apps/api/webview").then(async ({ getCurrentWebview }) => {
