@@ -375,7 +375,8 @@ fn kill_tree(child: &mut Child) {
     #[cfg(unix)]
     {
         // Negative PID = the whole process group created in `hide_window`.
-        let _ = Command::new("kill").args(["-KILL", &format!("-{}", child.id())]).status();
+        let _ =
+            Command::new("kill").args(["-KILL", "--", &format!("-{}", child.id())]).stdout(Stdio::null()).stderr(Stdio::null()).status();
     }
     #[cfg(windows)]
     {
@@ -531,7 +532,7 @@ mod tests {
         let h2 = handle.clone();
         let t = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(1500));
-            eprintln!("DBG cancel at 1.5s"); let r = h2.cancel(); eprintln!("DBG cancel returned {r}"); assert!(r);
+            assert!(h2.cancel());
         });
         let res = compile(&req, &handle, |_| {}).unwrap();
         t.join().unwrap();
