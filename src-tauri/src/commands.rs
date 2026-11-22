@@ -1,0 +1,173 @@
+//! Tauri commands: thin wrappers around `core`. No logic lives here beyond
+//! argument plumbing, threading and event emission.
+
+use crate::core::archive;
+use crate::core::compile::{self, CancelHandle, CompileRequest, CompileResult, EngineStatus};
+use crate::core::error::{AppError, ErrorSource, Result};
+use crate::core::project::{self, FileNode, ProjectInfo, BUILD_DIR};
+use crate::core::refs::{self, ProjectRefs};
+use crate::core::settings::{self, ProjectSettings};
+use crate::core::templates::{self, Template};
+use std::path::{Path, PathBuf};
+use tauri::{AppHandle, Emitter, Manager, State};
+
+#[derive(Default)]
+pub struct AppState {
+    pub compile: CancelHandle,
+}
+
+/// Runs blocking core work off the main thread.
+async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T> + Send + 'static) -> Result<T> {
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| AppError::new(ErrorSource::App, "Internal task failed").detail(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn detect_engines() -> EngineStatus {
+    tauri::async_runtime::spawn_blocking(compile::detect_engines).await.unwrap_or(EngineStatus {
+        tectonic: None,
+        latexmk: None,
+        tectonic_cache_ready: false,
+    })
+}
+
+#[tauri::command]
+pub async fn open_project(root: String) -> Result<ProjectInfo> {
+    blocking(move || project::open(Path::new(&root))).await
+}
+
+#[tauri::command]
+pub async fn read_tree(root: String) -> Result<Vec<FileNode>> {
+    blocking(move || project::read_tree(Path::new(&root))).await
+}
+
+#[tauri::command]
+pub fn project_exists(root: String) -> bool {
+    Path::new(&root).is_dir()
+}
+
+#[tauri::command]
+pub async fn read_file(root: String, path: String) -> Result<String> {
+    blocking(move || project::read_text(Path::new(&root), &path)).await
+}
+
+#[tauri::command]
+pub async fn write_file(root: String, path: String, content: String) -> Result<()> {
+    blocking(move || project::write_text(Path::new(&root), &path, &content)).await
+}
+
+#[tauri::command]
+pub async fn create_file(root: String, path: String) -> Result<()> {
+    blocking(move || project::create_file(Path::new(&root), &path)).await
+}
+
+#[tauri::command]
+pub async fn create_dir(root: String, path: String) -> Result<()> {
+    blocking(move || project::create_dir(Path::new(&root), &path)).await
+}
+
+#[tauri::command]
+pub async fn rename_path(root: String, from: String, to: String) -> Result<()> {
+    blocking(move || project::rename(Path::new(&root), &from, &to)).await
+}
+
+#[tauri::command]
+pub async fn trash_path(root: String, path: String) -> Result<()> {
+    blocking(move || project::trash(Path::new(&root), &path)).await
+}
+
+#[tauri::command]
+pub async fn scan_refs(root: String) -> Result<ProjectRefs> {
+    blocking(move || {
+        let root = PathBuf::from(root);
+        let tree = project::read_tree(&root)?;
+        Ok(refs::scan(&root, &tree))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn save_project_settings(root: String, settings: ProjectSettings) -> Result<()> {
+    blocking(move || settings::save(Path::new(&root), &settings)).await
+}
+
+#[tauri::command]
+pub async fn tex_root(root: String, path: String) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || settings::tex_root(Path::new(&root), &path)).await.ok().flatten()
+}
+
+#[tauri::command]
+pub async fn new_project(parent: String, name: String, template: Template) -> Result<String> {
+    blocking(move || templates::new_project(Path::new(&parent), &name, template).map(|p| p.display().to_string())).await
+}
+
+/// Creates (or reuses) the example project in the user's Documents folder.
+#[tauri::command]
+pub async fn welcome_project(app: AppHandle, fresh: bool) -> Result<String> {
+    let docs = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().home_dir())
+        .map_err(|e| AppError::new(ErrorSource::FileSystem, "Couldn't find your Documents folder").detail(e.to_string()))?;
+    blocking(move || templates::ensure_welcome(&docs, fresh).map(|p| p.display().to_string())).await
+}
+
+#[tauri::command]
+pub async fn import_zip(zip: String, dest_parent: String) -> Result<String> {
+    blocking(move || archive::import_zip(Path::new(&zip), Path::new(&dest_parent)).map(|p| p.display().to_string())).await
+}
+
+#[tauri::command]
+pub async fn export_zip(root: String, dest: String, clean: bool) -> Result<usize> {
+    blocking(move || archive::export_zip(Path::new(&root), Path::new(&dest), clean)).await
+}
+
+fn pdf_path(root: &str, main_file: &str) -> Result<PathBuf> {
+    let root = Path::new(root);
+    project::resolve(root, main_file)?;
+    let stem = Path::new(main_file).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    Ok(root.join(BUILD_DIR).join("out").join(format!("{stem}.pdf")))
+}
+
+/// The compiled PDF as raw bytes (no JSON number arrays).
+#[tauri::command]
+pub async fn read_pdf(root: String, main_file: String) -> Result<tauri::ipc::Response> {
+    blocking(move || {
+        let p = pdf_path(&root, &main_file)?;
+        std::fs::read(&p).map(tauri::ipc::Response::new).map_err(|e| AppError::io("open the PDF", &p, e))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn export_pdf(root: String, main_file: String, dest: String) -> Result<()> {
+    blocking(move || {
+        let p = pdf_path(&root, &main_file)?;
+        std::fs::copy(&p, &dest).map(|_| ()).map_err(|e| AppError::io("export the PDF to", Path::new(&dest), e))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn compile(app: AppHandle, state: State<'_, AppState>, request: CompileRequest) -> Result<CompileResult> {
+    let cancel = state.compile.clone();
+    blocking(move || {
+        // Only one build at a time: stop a running one and wait for it to wind down.
+        if cancel.cancel() {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while cancel.is_running() && std::time::Instant::now() < deadline {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+        }
+        compile::compile(&request, &cancel, |p| {
+            let _ = app.emit("compile://progress", p);
+        })
+    })
+    .await
+}
+
+#[tauri::command]
+pub fn cancel_compile(state: State<'_, AppState>) -> bool {
+    state.compile.cancel()
+}

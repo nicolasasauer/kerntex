@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -65,19 +66,31 @@ pub struct CompileResult {
 pub struct EngineStatus {
     pub tectonic: Option<String>,
     pub latexmk: Option<String>,
+    /// False until Tectonic has downloaded its package bundle once. The UI
+    /// uses this to announce the one-time download on the first compile.
+    pub tectonic_cache_ready: bool,
 }
 
 /// Shared handle so a running build can be cancelled from another thread.
 #[derive(Default, Clone)]
-pub struct CancelHandle(Arc<Mutex<Option<Child>>>);
+pub struct CancelHandle {
+    child: Arc<Mutex<Option<Child>>>,
+    canceled: Arc<AtomicBool>,
+}
 
 impl CancelHandle {
+    /// Kills the running engine process. Returns false if nothing was running.
     pub fn cancel(&self) -> bool {
-        if let Some(child) = self.0.lock().unwrap().as_mut() {
-            let _ = child.kill();
+        if let Some(child) = self.child.lock().unwrap().as_mut() {
+            self.canceled.store(true, Ordering::SeqCst);
+            kill_tree(child);
             return true;
         }
         false
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.child.lock().unwrap().is_some()
     }
 }
 
@@ -85,6 +98,22 @@ pub fn detect_engines() -> EngineStatus {
     EngineStatus {
         tectonic: find_tectonic().map(|p| p.display().to_string()),
         latexmk: find_in_path("latexmk").map(|p| p.display().to_string()),
+        tectonic_cache_ready: tectonic_cache_dir().is_some_and(|d| d.read_dir().map(|mut r| r.next().is_some()).unwrap_or(false)),
+    }
+}
+
+/// Where Tectonic keeps downloaded packages (mirrors its own lookup).
+fn tectonic_cache_dir() -> Option<PathBuf> {
+    if let Some(d) = std::env::var_os("TECTONIC_CACHE_DIR") {
+        return Some(PathBuf::from(d));
+    }
+    let env = |k: &str| std::env::var_os(k).map(PathBuf::from);
+    if cfg!(windows) {
+        env("LOCALAPPDATA").map(|d| d.join("TectonicProject").join("Tectonic"))
+    } else if cfg!(target_os = "macos") {
+        env("HOME").map(|d| d.join("Library/Caches/Tectonic"))
+    } else {
+        env("XDG_CACHE_HOME").or_else(|| env("HOME").map(|h| h.join(".cache"))).map(|d| d.join("Tectonic"))
     }
 }
 
@@ -102,7 +131,11 @@ pub fn find_tectonic() -> Option<PathBuf> {
 }
 
 fn exe_name(name: &str) -> String {
-    if cfg!(windows) { format!("{name}.exe") } else { name.to_string() }
+    if cfg!(windows) {
+        format!("{name}.exe")
+    } else {
+        name.to_string()
+    }
 }
 
 pub fn find_in_path(name: &str) -> Option<PathBuf> {
@@ -139,7 +172,7 @@ pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: imp
 
     let child = cmd
         .current_dir(&root)
-        .env("max_print_line", "100000") // stop TeX from wrapping log lines at 79 chars
+        .env("max_print_line", "10000") // stop TeX wrapping log lines at 79 chars; >~30000 breaks BibTeX
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -151,7 +184,8 @@ pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: imp
         })?;
 
     let (stdout, stderr) = {
-        let mut slot = cancel.0.lock().unwrap();
+        cancel.canceled.store(false, Ordering::SeqCst);
+        let mut slot = cancel.child.lock().unwrap();
         *slot = Some(child);
         let c = slot.as_mut().unwrap();
         (c.stdout.take().unwrap(), c.stderr.take().unwrap())
@@ -176,7 +210,7 @@ pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: imp
             }
         }
         let done = {
-            let mut slot = cancel.0.lock().unwrap();
+            let mut slot = cancel.child.lock().unwrap();
             match slot.as_mut().map(|c| c.try_wait()) {
                 Some(Ok(Some(status))) => {
                     *slot = None;
@@ -209,13 +243,29 @@ pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: imp
     let status = match status {
         Ok(s) => s,
         Err(_) => {
-            return Ok(CompileResult { ok: false, canceled: true, pdf_path: existing(&pdf), diagnostics: vec![], duration_ms, log, engine_label: label })
+            return Ok(CompileResult {
+                ok: false,
+                canceled: true,
+                pdf_path: existing(&pdf),
+                diagnostics: vec![],
+                duration_ms,
+                log,
+                engine_label: label,
+            })
         }
     };
-    #[cfg(unix)]
-    let killed = std::os::unix::process::ExitStatusExt::signal(&status).is_some();
-    #[cfg(not(unix))]
-    let killed = false;
+    let killed = cancel.canceled.swap(false, Ordering::SeqCst);
+    if killed {
+        return Ok(CompileResult {
+            ok: false,
+            canceled: true,
+            pdf_path: existing(&pdf),
+            diagnostics: vec![],
+            duration_ms,
+            log,
+            engine_label: label,
+        });
+    }
 
     let mut diags = match req.engine {
         Engine::Tectonic => diagnostics::parse_tectonic(&log),
@@ -243,7 +293,7 @@ pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: imp
     }
 
     let has_errors = diags.iter().any(|d| d.severity == Severity::Error);
-    if !status.success() && !has_errors && !killed {
+    if !status.success() && !has_errors {
         // The engine failed but we couldn't pinpoint why: say so honestly.
         diags.insert(0, Diagnostic {
             severity: Severity::Error,
@@ -257,7 +307,7 @@ pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: imp
 
     Ok(CompileResult {
         ok: status.success() && !has_errors,
-        canceled: killed,
+        canceled: false,
         pdf_path: existing(&pdf),
         diagnostics: diags,
         duration_ms,
@@ -281,20 +331,16 @@ fn read_lines(stream: impl Read, tx: std::sync::mpsc::Sender<String>) {
 fn build_command(req: &CompileRequest, _root: &Path, out_dir: &Path) -> Result<(Command, String)> {
     match req.engine {
         Engine::Tectonic => {
-            let bin = find_tectonic().ok_or_else(|| {
-                AppError::new(ErrorSource::Engine, "Tectonic wasn't found").hint(missing_engine_hint(Engine::Tectonic))
-            })?;
+            let bin = find_tectonic()
+                .ok_or_else(|| AppError::new(ErrorSource::Engine, "Tectonic wasn't found").hint(missing_engine_hint(Engine::Tectonic)))?;
             let mut c = Command::new(bin);
-            c.args(["-X", "compile", "--synctex", "--keep-logs", "--keep-intermediates", "--outdir"])
-                .arg(out_dir)
-                .arg(&req.main_file);
+            c.args(["-X", "compile", "--synctex", "--keep-logs", "--keep-intermediates", "--outdir"]).arg(out_dir).arg(&req.main_file);
             hide_window(&mut c);
             Ok((c, "Tectonic".into()))
         }
         Engine::Latexmk => {
-            let bin = find_in_path("latexmk").ok_or_else(|| {
-                AppError::new(ErrorSource::Engine, "latexmk wasn't found").hint(missing_engine_hint(Engine::Latexmk))
-            })?;
+            let bin = find_in_path("latexmk")
+                .ok_or_else(|| AppError::new(ErrorSource::Engine, "latexmk wasn't found").hint(missing_engine_hint(Engine::Latexmk)))?;
             let (flag, name) = match req.flavor {
                 TexFlavor::Pdflatex => ("-pdf", "pdfLaTeX"),
                 TexFlavor::Xelatex => ("-xelatex", "XeLaTeX"),
@@ -310,14 +356,36 @@ fn build_command(req: &CompileRequest, _root: &Path, out_dir: &Path) -> Result<(
     }
 }
 
+/// No console window on Windows; on Unix the engine gets its own process
+/// group so cancelling also stops the TeX runs latexmk spawns.
 #[cfg(windows)]
 fn hide_window(c: &mut Command) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     c.creation_flags(CREATE_NO_WINDOW);
 }
-#[cfg(not(windows))]
-fn hide_window(_: &mut Command) {}
+#[cfg(unix)]
+fn hide_window(c: &mut Command) {
+    use std::os::unix::process::CommandExt;
+    c.process_group(0);
+}
+
+/// Kills the engine and everything it started (latexmk → pdflatex, biber …).
+fn kill_tree(child: &mut Child) {
+    #[cfg(unix)]
+    {
+        // Negative PID = the whole process group created in `hide_window`.
+        let _ = Command::new("kill").args(["-KILL", &format!("-{}", child.id())]).status();
+    }
+    #[cfg(windows)]
+    {
+        let mut c = Command::new("taskkill");
+        c.args(["/T", "/F", "/PID", &child.id().to_string()]).stdout(Stdio::null()).stderr(Stdio::null());
+        hide_window(&mut c);
+        let _ = c.status();
+    }
+    let _ = child.kill();
+}
 
 fn missing_engine_hint(engine: Engine) -> &'static str {
     match engine {
@@ -372,7 +440,10 @@ mod tests {
         let s = Instant::now();
         let mut pass = 0;
         assert_eq!(progress_for("note: Running TeX ...", Engine::Tectonic, &mut pass, s).unwrap().stage, "Typesetting (pass 1)");
-        assert_eq!(progress_for("note: downloading amsmath.sty", Engine::Tectonic, &mut pass, s).unwrap().detail.as_deref(), Some("amsmath.sty"));
+        assert_eq!(
+            progress_for("note: downloading amsmath.sty", Engine::Tectonic, &mut pass, s).unwrap().detail.as_deref(),
+            Some("amsmath.sty")
+        );
         assert_eq!(progress_for("Run number 1 of rule 'pdflatex'", Engine::Latexmk, &mut pass, s).unwrap().stage, "Typesetting (pass 2)");
         assert!(progress_for("random", Engine::Latexmk, &mut pass, s).is_none());
     }
@@ -385,8 +456,18 @@ mod tests {
         }
         let root = std::env::temp_dir().join(format!("kerntex-e2e-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        project::write_text(&root, "main.tex", "\\documentclass{article}\n\\begin{document}\nHello \\foo world, see \\ref{nope}.\n\\end{document}\n").unwrap();
-        let req = CompileRequest { root: root.display().to_string(), main_file: "main.tex".into(), engine: Engine::Latexmk, flavor: TexFlavor::Pdflatex };
+        project::write_text(
+            &root,
+            "main.tex",
+            "\\documentclass{article}\n\\begin{document}\nHello \\foo world, see \\ref{nope}.\n\\end{document}\n",
+        )
+        .unwrap();
+        let req = CompileRequest {
+            root: root.display().to_string(),
+            main_file: "main.tex".into(),
+            engine: Engine::Latexmk,
+            flavor: TexFlavor::Pdflatex,
+        };
         let mut stages = vec![];
         let res = compile(&req, &CancelHandle::default(), |p| stages.push(p.stage)).unwrap();
         assert!(!res.ok);
@@ -397,6 +478,65 @@ mod tests {
         assert!(err.hint.is_some());
         assert!(res.diagnostics.iter().any(|d| d.message.contains("Reference `nope'")));
         assert!(stages.iter().any(|s| s.starts_with("Typesetting")));
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    /// The welcome project and every template must compile cleanly.
+    #[test]
+    fn latexmk_compiles_welcome_and_templates() {
+        use crate::core::templates::{self, Template};
+        if find_in_path("latexmk").is_none() {
+            eprintln!("latexmk not installed; skipping");
+            return;
+        }
+        let base = std::env::temp_dir().join(format!("kerntex-e2e-tpl-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        let mut roots = vec![templates::ensure_welcome(&base, false).unwrap()];
+        for (i, t) in [Template::Blank, Template::Article, Template::Report, Template::Beamer, Template::Letter].into_iter().enumerate() {
+            roots.push(templates::new_project(&base, &format!("t{i}"), t).unwrap());
+        }
+        for root in roots {
+            let req = CompileRequest {
+                root: root.display().to_string(),
+                main_file: "main.tex".into(),
+                engine: Engine::Latexmk,
+                flavor: TexFlavor::Pdflatex,
+            };
+            let res = compile(&req, &CancelHandle::default(), |_| {}).unwrap();
+            let errors: Vec<_> = res.diagnostics.iter().filter(|d| d.severity == Severity::Error).collect();
+            assert!(res.ok && res.pdf_path.is_some(), "{}: {errors:?}\n{}", root.display(), &res.log[res.log.len().saturating_sub(3000)..]);
+            let undefined: Vec<_> = res.diagnostics.iter().filter(|d| d.message.contains("undefined")).collect();
+            assert!(undefined.is_empty(), "{}: unresolved refs {undefined:?}", root.display());
+        }
+        std::fs::remove_dir_all(base).ok();
+    }
+
+    #[test]
+    fn cancel_stops_build() {
+        if find_in_path("latexmk").is_none() {
+            return;
+        }
+        let root = std::env::temp_dir().join(format!("kerntex-cancel-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        // An endless loop keeps TeX busy until it is killed.
+        project::write_text(&root, "main.tex", "\\documentclass{article}\\begin{document}\\def\\x{\\x}\\x\\end{document}").unwrap();
+        let req = CompileRequest {
+            root: root.display().to_string(),
+            main_file: "main.tex".into(),
+            engine: Engine::Latexmk,
+            flavor: TexFlavor::Pdflatex,
+        };
+        let handle = CancelHandle::default();
+        let h2 = handle.clone();
+        let t = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(1500));
+            eprintln!("DBG cancel at 1.5s"); let r = h2.cancel(); eprintln!("DBG cancel returned {r}"); assert!(r);
+        });
+        let res = compile(&req, &handle, |_| {}).unwrap();
+        t.join().unwrap();
+        assert!(res.canceled && !res.ok);
+        assert!(!handle.is_running());
         std::fs::remove_dir_all(root).ok();
     }
 }

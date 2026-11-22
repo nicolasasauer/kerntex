@@ -6,6 +6,7 @@
 //! that would escape the project folder.
 
 use super::error::{AppError, ErrorSource, Result};
+use super::settings::{self, BuildHints, ProjectSettings};
 use serde::Serialize;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -17,9 +18,36 @@ const SKIP_DIRS: &[&str] = &[".git", ".svn", "node_modules", BUILD_DIR, ".vscode
 
 /// Files LaTeX generates; shown dimmed in the tree, dropped by "clean" export.
 pub const AUX_EXTENSIONS: &[&str] = &[
-    "aux", "log", "out", "toc", "lof", "lot", "fls", "fdb_latexmk", "synctex", "synctex.gz", "bcf",
-    "blg", "run.xml", "nav", "snm", "vrb", "xdv", "idx", "ilg", "ind", "dvi", "glo", "gls", "glg",
-    "ist", "acn", "acr", "alg", "loa", "thm",
+    "aux",
+    "log",
+    "out",
+    "toc",
+    "lof",
+    "lot",
+    "fls",
+    "fdb_latexmk",
+    "synctex",
+    "synctex.gz",
+    "bcf",
+    "blg",
+    "run.xml",
+    "nav",
+    "snm",
+    "vrb",
+    "xdv",
+    "idx",
+    "ilg",
+    "ind",
+    "dvi",
+    "glo",
+    "gls",
+    "glg",
+    "ist",
+    "acn",
+    "acr",
+    "alg",
+    "loa",
+    "thm",
 ];
 
 #[derive(Debug, Clone, Serialize)]
@@ -40,8 +68,10 @@ pub struct ProjectInfo {
     pub root: String,
     pub name: String,
     pub tree: Vec<FileNode>,
-    /// Best guess for the root document, relative path.
+    /// Root document: the saved choice if still valid, else the best guess.
     pub main_file: Option<String>,
+    pub settings: ProjectSettings,
+    pub hints: BuildHints,
 }
 
 pub fn is_generated(name: &str) -> bool {
@@ -81,12 +111,17 @@ pub fn open(root: &Path) -> Result<ProjectInfo> {
             .hint("Open the folder that contains your .tex files, or import a .zip via “Import ZIP”."));
     }
     let tree = read_tree(root)?;
-    let main_file = detect_main(root, &tree);
+    let settings = settings::load(root);
+    let saved = settings.main_file.clone().filter(|m| resolve(root, m).map(|p| p.is_file()).unwrap_or(false));
+    let main_file = saved.or_else(|| detect_main(root, &tree));
+    let hints = settings::build_hints(root, main_file.as_deref());
     Ok(ProjectInfo {
         root: root.display().to_string(),
         name: root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
         tree,
         main_file,
+        settings,
+        hints,
     })
 }
 
@@ -143,7 +178,8 @@ pub fn detect_main(root: &Path, tree: &[FileNode]) -> Option<String> {
             best = Some((score, rel));
         }
     }
-    best.map(|(_, r)| r)
+    // A candidate may itself point elsewhere via `% !TEX root = …`.
+    best.map(|(_, r)| settings::tex_root(root, &r).unwrap_or(r))
 }
 
 /// True if `cmd` occurs outside a `%` comment.
@@ -189,10 +225,7 @@ pub fn write_text(root: &Path, rel: &str, content: &str) -> Result<()> {
     if let Some(parent) = abs.parent() {
         fs::create_dir_all(parent).map_err(|e| AppError::io("create the folder for", &abs, e))?;
     }
-    let tmp = abs.with_extension(format!(
-        "{}.kerntex-tmp",
-        abs.extension().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default()
-    ));
+    let tmp = abs.with_extension(format!("{}.kerntex-tmp", abs.extension().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default()));
     fs::write(&tmp, content).map_err(|e| AppError::io("save", &abs, e))?;
     fs::rename(&tmp, &abs).map_err(|e| {
         let _ = fs::remove_file(&tmp);
@@ -232,48 +265,6 @@ pub fn trash(root: &Path, rel: &str) -> Result<()> {
     })
 }
 
-pub const TEMPLATE: &str = r"\documentclass[11pt]{article}
-\usepackage[T1]{fontenc}
-\usepackage{lmodern}
-\usepackage{amsmath}
-\usepackage{graphicx}
-\usepackage[hidelinks]{hyperref}
-
-\title{Untitled}
-\author{}
-\date{\today}
-
-\begin{document}
-\maketitle
-
-\section{Introduction}
-Welcome to \emph{KernTeX}. Edit this file and press \texttt{Ctrl+S} --- the
-PDF on the right updates automatically.
-
-\begin{equation}
-  e^{i\pi} + 1 = 0
-\end{equation}
-
-\end{document}
-";
-
-/// Creates `parent/name/main.tex`; returns the new project root.
-pub fn new_project(parent: &Path, name: &str) -> Result<PathBuf> {
-    let name = name.trim();
-    if name.is_empty() || name.contains(['/', '\\', ':', '*', '?', '"', '<', '>', '|']) {
-        return Err(AppError::new(ErrorSource::App, "Invalid project name")
-            .hint("Use letters, numbers, spaces, dashes or underscores — no slashes or special characters like : * ? \" < > |."));
-    }
-    let root = parent.join(name);
-    if root.exists() {
-        return Err(AppError::io("create the project", &root, std::io::ErrorKind::AlreadyExists.into()));
-    }
-    fs::create_dir_all(&root).map_err(|e| AppError::io("create the project", &root, e))?;
-    write_text(&root, "main.tex", TEMPLATE)?;
-    write_text(&root, ".gitignore", &format!("{BUILD_DIR}/\n"))?;
-    Ok(root)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -300,7 +291,12 @@ mod tests {
         let root = tmp();
         write_text(&root, "chapters/intro.tex", "\\section{Intro}").unwrap();
         write_text(&root, "old/draft.tex", "\\documentclass{article}\n\\begin{document}x\\end{document}").unwrap();
-        write_text(&root, "thesis.tex", "% \\documentclass in a comment\n\\documentclass{report}\n\\begin{document}\\input{chapters/intro}\\end{document}").unwrap();
+        write_text(
+            &root,
+            "thesis.tex",
+            "% \\documentclass in a comment\n\\documentclass{report}\n\\begin{document}\\input{chapters/intro}\\end{document}",
+        )
+        .unwrap();
         write_text(&root, "notes.tex", "% \\documentclass{article}").unwrap();
         let info = open(&root).unwrap();
         assert_eq!(info.main_file.as_deref(), Some("thesis.tex"));

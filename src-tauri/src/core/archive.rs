@@ -7,9 +7,12 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 fn zip_err(action: &str, path: &Path, e: impl std::fmt::Display) -> AppError {
-    AppError::new(ErrorSource::Archive, format!("Couldn't {action} “{}”", path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()))
-        .detail(e.to_string())
-        .hint("Make sure it's a regular, complete .zip file (re-download it if unsure). Password-protected or split archives aren't supported.")
+    AppError::new(
+        ErrorSource::Archive,
+        format!("Couldn't {action} “{}”", path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()),
+    )
+    .detail(e.to_string())
+    .hint("Make sure it's a regular, complete .zip file (re-download it if unsure). Password-protected or split archives aren't supported.")
 }
 
 /// Extracts `zip_path` into a new folder inside `dest_parent` and returns it.
@@ -19,9 +22,7 @@ pub fn import_zip(zip_path: &Path, dest_parent: &Path) -> Result<PathBuf> {
     let file = File::open(zip_path).map_err(|e| AppError::io("open", zip_path, e))?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| zip_err("read", zip_path, e))?;
 
-    let names: Vec<PathBuf> = (0..archive.len())
-        .filter_map(|i| archive.by_index(i).ok()?.enclosed_name())
-        .collect();
+    let names: Vec<PathBuf> = (0..archive.len()).filter_map(|i| archive.by_index(i).ok()?.enclosed_name()).collect();
     let strip = common_root(&names);
 
     let stem = zip_path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "project".into());
