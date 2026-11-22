@@ -91,6 +91,18 @@ pub fn export_zip(root: &Path, dest: &Path, clean: bool) -> Result<usize> {
                 continue;
             }
             if path.is_dir() {
+                if name == BUILD_DIR && !clean {
+                    // Keep per-project settings with the project, but never build output.
+                    let settings = path.join(super::settings::SETTINGS_FILE);
+                    if settings.is_file() {
+                        zip.start_file(format!("{BUILD_DIR}/{}", super::settings::SETTINGS_FILE), opts)
+                            .map_err(|e| zip_err("write", dest, e))?;
+                        let mut f = File::open(&settings).map_err(|e| AppError::io("read", &settings, e))?;
+                        io::copy(&mut f, &mut zip).map_err(|e| AppError::io("write", dest, e))?;
+                        count += 1;
+                    }
+                    continue;
+                }
                 if [".git", BUILD_DIR, "node_modules"].contains(&name.as_str()) {
                     continue;
                 }
@@ -126,7 +138,10 @@ mod tests {
         project::write_text(&src, "img/a.txt", "x").unwrap();
         project::write_text(&src, ".kerntex/out/main.pdf", "x").unwrap();
         let z = base.join("proj.zip");
+        project::write_text(&src, ".kerntex/project.json", "{}").unwrap();
         assert_eq!(export_zip(&src, &z, true).unwrap(), 3);
+        let full = base.join("full.zip");
+        assert_eq!(export_zip(&src, &full, false).unwrap(), 5, "main.tex, main.aux, main.bbl, img/a.txt, .kerntex/project.json");
 
         let dest = import_zip(&z, &base).unwrap();
         assert_eq!(dest.file_name().unwrap(), "proj");
