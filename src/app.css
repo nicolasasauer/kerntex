@@ -1,0 +1,277 @@
+/* KernTeX design tokens. Light is the default; dark applies via
+   [data-theme="dark"] on <html>, set from the user's preference. */
+
+:root {
+  --font-ui: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", "Cascadia Mono", Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
+
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --surface-raised: #ffffff;
+  --editor-bg: #ffffff;
+  --pdf-bg: #e9ecf1;
+  --input-bg: #ffffff;
+  --border: #e2e5ea;
+  --border-strong: #cfd4dc;
+  --text: #1d2330;
+  --text-muted: #5b6474;
+  --text-faint: #98a0ae;
+  --accent: #3b5bdb;
+  --accent-hover: #3451c4;
+  --accent-soft: #e7ecfd;
+  --on-accent: #ffffff;
+  --danger: #d6336c;
+  --danger-soft: #fde8ef;
+  --warning: #d9822b;
+  --warning-soft: #fdf1e3;
+  --info: #1c7ed6;
+  --info-soft: #e5f1fc;
+  --success: #2f9e44;
+  --success-soft: #e6f5e9;
+  --hover: rgba(30, 40, 60, 0.06);
+  --pressed: rgba(30, 40, 60, 0.11);
+  --selection: #d4defc;
+  --selection-match: #e8edfd;
+  --active-line: #f6f8fc;
+  --bracket-match: #dfe6fb;
+  --search-match: #ffe8a3;
+  --search-match-selected: #ffd25e;
+  --shadow-sm: 0 1px 2px rgba(20, 30, 50, 0.06);
+  --shadow-lg: 0 10px 30px rgba(20, 30, 50, 0.14), 0 2px 6px rgba(20, 30, 50, 0.08);
+  --backdrop: rgba(20, 25, 35, 0.32);
+
+  --syn-command: #3b5bdb;
+  --syn-keyword: #9c36b5;
+  --syn-atom: #c2255c;
+  --syn-number: #e8590c;
+  --syn-math: #0b7285;
+  --syn-comment: #8c95a4;
+  --syn-bracket: #5b6474;
+  --syn-string: #2b8a3e;
+
+  --radius: 8px;
+  --radius-sm: 6px;
+  --dur: 180ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #13161c;
+  --surface: #1a1e26;
+  --surface-2: #20252f;
+  --surface-raised: #242a35;
+  --editor-bg: #171b22;
+  --pdf-bg: #0f1216;
+  --input-bg: #13161c;
+  --border: #2a303b;
+  --border-strong: #39414f;
+  --text: #e3e7ee;
+  --text-muted: #9aa3b2;
+  --text-faint: #636c7b;
+  --accent: #7b93f6;
+  --accent-hover: #93a7f8;
+  --accent-soft: #27304d;
+  --on-accent: #0f1322;
+  --danger: #f06595;
+  --danger-soft: #3a1f2b;
+  --warning: #f5a65b;
+  --warning-soft: #3a2b1c;
+  --info: #5cb3f5;
+  --info-soft: #1b2d3d;
+  --success: #69db7c;
+  --success-soft: #1c3322;
+  --hover: rgba(255, 255, 255, 0.06);
+  --pressed: rgba(255, 255, 255, 0.11);
+  --selection: #2f3c66;
+  --selection-match: #29314a;
+  --active-line: #1c212a;
+  --bracket-match: #2e3756;
+  --search-match: #5a4a16;
+  --search-match-selected: #806614;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 36px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --backdrop: rgba(0, 0, 0, 0.5);
+
+  --syn-command: #8ea2ff;
+  --syn-keyword: #d68cf0;
+  --syn-atom: #f783ac;
+  --syn-number: #ffa94d;
+  --syn-math: #66d9e8;
+  --syn-comment: #6b7484;
+  --syn-bracket: #9aa3b2;
+  --syn-string: #8ce99a;
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0ms !important;
+    transition-duration: 0ms !important;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* --- Buttons: every button shows hover + pressed state immediately --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), transform 80ms ease;
+}
+.btn:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+.btn:active {
+  transform: scale(0.97);
+  background: var(--pressed);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.btn.primary:hover {
+  background: var(--accent-hover);
+}
+.btn.danger {
+  color: var(--danger);
+}
+.btn.ghost {
+  border-color: transparent;
+  background: transparent;
+}
+.btn.ghost:hover {
+  background: var(--hover);
+}
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease), transform 80ms ease;
+}
+.icon-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.icon-btn:active {
+  background: var(--pressed);
+  transform: scale(0.92);
+}
+.icon-btn.on {
+  color: var(--accent);
+}
+
+.input {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--text);
+  user-select: text;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+kbd {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
