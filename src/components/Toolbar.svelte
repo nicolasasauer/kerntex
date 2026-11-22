@@ -19,6 +19,7 @@
   let now = $state(performance.now());
   $effect(() => {
     if (ws.status.state !== "running") return;
+    now = performance.now();
     const t = setInterval(() => (now = performance.now()), 100);
     return () => clearInterval(t);
   });
@@ -76,7 +77,7 @@
             {/if}
           </span>
           {#if ws.status.detail}<span class="detail muted">{ws.status.detail}</span>{/if}
-          <span class="time muted">{secs(now - ws.status.startedAt)}</span>
+          <span class="time muted">{secs(Math.max(0, now - ws.status.startedAt))}</span>
         </div>
       {:else}
         <button class="btn primary compile" onclick={() => ws.compile()} title="Compile ({fmt('Mod+Enter')}, or save with {modKey}+S)">

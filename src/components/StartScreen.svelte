@@ -58,7 +58,7 @@
               <button class="recent-item" onclick={() => ws.openProject(r.root)} title={r.root}>
                 <Folder size={16} />
                 <span class="rname">{r.name}</span>
-                <span class="rpath muted">{r.root}</span>
+                <span class="rpath muted"><bdi>{r.root}</bdi></span>
                 <span class="rtime muted">{ago(r.openedAt)}</span>
               </button>
               <button class="icon-btn remove" title="Remove from list (the folder is not touched)" aria-label="Remove {r.name} from recent projects" onclick={() => removeRecent(r.root)}>
