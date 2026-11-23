@@ -8,7 +8,7 @@
 // Env:   GITHUB_TOKEN (optional, avoids API rate limits in CI)
 
 import { execFileSync } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, statSync, chmodSync } from "node:fs";
+import { copyFileSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -122,7 +122,8 @@ async function main() {
     if (!bin) throw new Error(`The archive ${asset.name} doesn't contain a tectonic binary.`);
 
     mkdirSync(outDir, { recursive: true });
-    renameSync(bin, dest);
+    // Copy, not rename: the temp folder may be on another drive (C: vs D: on Windows CI).
+    copyFileSync(bin, dest);
     if (!windows) chmodSync(dest, 0o755);
     console.log(`✔ Tectonic ${asset.version} → ${dest}`);
   } finally {

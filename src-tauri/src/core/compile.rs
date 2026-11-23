@@ -304,6 +304,10 @@ pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: imp
     let log_file = out_dir.join(format!("{stem}.log"));
     let tex_log = std::fs::read_to_string(&log_file).unwrap_or_default();
     let mut details = buildinfo::parse_log(&tex_log);
+    if details.program.is_none() && req.engine == Engine::Tectonic {
+        // Tectonic's log has no "This is …" banner; its engine is XeTeX-based.
+        details.program = Some("XeTeX engine built into Tectonic".into());
+    }
     details.passes = pass;
     details.engine_path = Some(engine_path);
     details.out_dir = Some(out_dir.display().to_string());
