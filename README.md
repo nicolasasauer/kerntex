@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo/logo.svg" alt="KernTeX logo" width="112"></p>
+
 # KernTeX
 
 [![Written in Rust](https://img.shields.io/badge/written%20in-Rust-dea584?logo=rust&logoColor=white)](#built-with)
