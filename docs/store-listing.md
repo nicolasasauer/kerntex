@@ -98,7 +98,7 @@ Expected result: **3+ / Everyone**.
 | `5-build-details.png` | See the engine and every package your document uses |
 | `6-command-palette.png` | Every action one shortcut away |
 
-**Store logos:** optional — Partner Center takes the tiles from the package. If asked for a 1:1 box art, use `assets/logo.png` (1024×1024).
+**Store logos** (*Bilder für die Store-Anzeige*): optional, but upload them — otherwise the Store scales up the 50×50 logo from the package. Files in `docs/store/logos/`: `logo-300x300.png` (app tile, shown in the Store on Windows 10/11), `logo-150x150.png`, `logo-71x71.png`. For a larger 1:1 box art use `assets/logo.png` (1024×1024).
 
 **Search terms** [7]: `LaTeX`, `TeX`, `LaTeX editor`, `Overleaf`, `thesis`, `PDF`, `BibTeX`
 
