@@ -179,7 +179,7 @@ The documents are listed in `native/corpus/corpus.json` and fetched with git at
 pinned commits (nothing third-party is stored in this repository): the official
 Typst templates (IEEE paper, AMS article, book, newsletter with CeTZ drawings,
 letter), LaTeX's own documents (sample, user guide, LaTeX News, the amsmath
-guide), two Beamer talks, *The Not So Short Introduction to LaTeX*, 64 TikZ
+guide), two Beamer talks, 64 TikZ
 figures, and KernTeX's own two tours. Typst Universe packages are installed
 from the `typst/packages` repository, so no access to packages.typst.org is
 needed. A page counts as different where more than 5 % of its inked pixels
@@ -189,8 +189,8 @@ differences) of each document's least similar page. CI:
 `.github/workflows/corpus.yml` runs it with Tectonic, weekly and whenever the
 core or renderer changes, and shows the report as the job summary.
 
-Last local run (TeX Live 2023 via latexmk, 100 dpi): **79 documents, 221
-pages — 76 identical within tolerance, 2 flagged, 1 not compiled.**
+Last CI run (Tectonic, latexmk where noted, 100 dpi): **78 documents, 216
+pages — 76 identical within tolerance, 2 flagged, none failed.**
 
 * All Typst documents and all LaTeX documents (sample2e, usrguide, LaTeX News,
   amsldoc, both Beamer talks, the tours) match Poppler: mean difference ≤ 0.4 %.
@@ -198,8 +198,10 @@ pages — 76 identical within tolerance, 2 flagged, 1 not compiled.**
   *hairlines* (strokes thinner than a pixel) darker than Poppler, which
   thins them — visible in figures with hundreds of 0.1 pt lines. Both are
   valid; noted for a possible renderer setting.
-* *lshort* needs LuaLaTeX, whose font database is incomplete in this
-  container's TeX Live; CI installs it properly.
+* Documents Tectonic can't build run through latexmk, with the reason in the
+  report: the LaTeX team's guides need a newer kernel than Tectonic's bundle,
+  and the Beamer talks use `latin1` inputenc (pdfLaTeX only). *The Not So Short
+  Introduction* was dropped: it needs LuaLaTeX plus Persian and Arabic fonts.
 * Speed: hayro renders a page at 100 dpi in a median 13 ms (0.5–266 ms; 8 pages in parallel).
 
 ## Measurements

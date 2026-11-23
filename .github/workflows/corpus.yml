@@ -30,8 +30,8 @@ jobs:
       - name: Poppler (reference renderer) and TeX Live for documents Tectonic can't build
         run: |
           sudo apt-get update
-          sudo apt-get install -y poppler-utils latexmk texlive-luatex texlive-latex-recommended texlive-latex-extra texlive-pictures \
-            texlive-fonts-recommended texlive-fonts-extra texlive-science texlive-bibtex-extra texlive-lang-arabic lmodern
+          sudo apt-get install -y --no-install-recommends poppler-utils latexmk texlive-latex-recommended texlive-latex-extra \
+            texlive-pictures texlive-fonts-recommended lmodern
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2

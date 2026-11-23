@@ -5,7 +5,6 @@
     "typst-packages": { "repo": "https://github.com/typst/packages", "commit": "bde4aaf4c80912c8876bd5b80360a7acc459fd92", "license": "per package", "sparse": true },
     "latex2e": { "repo": "https://github.com/latex3/latex2e", "commit": "3220fd5d6bdbfe5af74f7a57aca60da69bd673e1", "license": "LPPL 1.3c", "note": "tag release-2022-11-01: its documents need a LaTeX kernel from 2022 or later, which TeX Live 2023+ and Tectonic have" },
     "beamer": { "repo": "https://github.com/josephwright/beamer", "commit": "e9e99b8fdc3084d9f118a761264be37184899e4b", "license": "LPPL 1.3c / GPL 2" },
-    "lshort": { "repo": "https://github.com/oetiker/lshort", "commit": "91758281b5f74de978660e0e630e127536626b8d", "license": "GPL 3" },
     "tikz": { "repo": "https://github.com/PetarV-/TikZ", "commit": "86aee049f5355d77c598b936399e42caf8941e60", "license": "MIT" }
   },
   "documents": [
@@ -22,7 +21,6 @@
     { "id": "latex/amsldoc", "what": "amsmath user guide: heavy mathematics", "source": "latex2e", "dir": "required/amsmath", "main": "amsldoc.tex" },
     { "id": "latex/beamer-talk", "what": "Beamer conference talk", "source": "beamer", "dir": "doc/examples/a-conference-talk", "main": "beamerexample-conference-talk.tex", "engine": "latexmk", "note": "pdfLaTeX document (non-UTF-8 inputenc), which Tectonic's XeTeX can't build" },
     { "id": "latex/beamer-ornate", "what": "Beamer solution template", "source": "beamer", "dir": "doc/solutions/conference-talks", "main": "conference-ornate-20min.en.tex", "engine": "latexmk", "note": "pdfLaTeX document (non-UTF-8 inputenc), which Tectonic's XeTeX can't build" },
-    { "id": "latex/lshort", "what": "The Not So Short Introduction to LaTeX (~150 pages)", "source": "lshort", "dir": "src", "main": "lshort.tex", "flavor": "lualatex", "engine": "latexmk", "note": "LuaLaTeX only; Tectonic has no LuaTeX" },
     { "id": "latex/kerntex-tour", "what": "KernTeX's LaTeX tour: bibliography, TikZ, listings (created by the core)", "source": "kerntex", "dir": "welcome", "main": "main.tex" },
     { "id": "tikz/*", "what": "TikZ figures (one document each)", "source": "tikz", "glob": "*/*.tex" }
   ]
