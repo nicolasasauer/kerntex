@@ -8,6 +8,8 @@
   import { ws } from "../lib/workspace.svelte";
   import { settings, removeRecent } from "../lib/settings.svelte";
   import { ui, fmt } from "../lib/commands.svelte";
+  import { openUrl } from "../lib/api";
+  import { APP_VERSION, LINKS, reportProblemUrl } from "../lib/about";
 
   function ago(t: number) {
     const s = (Date.now() - t) / 1000;
@@ -71,6 +73,16 @@
     </section>
 
     <p class="hint muted">Tip: drop a project folder or an Overleaf ZIP anywhere on this window. Press <kbd>{fmt("Mod+K")}</kbd> for all commands.</p>
+
+    <footer class="foot muted">
+      <span>KernTeX {APP_VERSION}</span>
+      <span aria-hidden="true">·</span>
+      <button onclick={() => (ui.about = true)}>About</button>
+      <span aria-hidden="true">·</span>
+      <button onclick={() => openUrl(LINKS.repo)}>GitHub</button>
+      <span aria-hidden="true">·</span>
+      <button onclick={() => openUrl(reportProblemUrl())}>Report a problem</button>
+    </footer>
   </div>
 </main>
 
@@ -207,6 +219,25 @@
     border: 1px dashed var(--border-strong);
     border-radius: 12px;
     margin: 0;
+  }
+  .foot {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 28px;
+    font-size: 12px;
+  }
+  .foot button {
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    font: inherit;
+  }
+  .foot button:hover {
+    color: var(--accent);
+    text-decoration: underline;
   }
   .hint {
     margin-top: 24px;

@@ -4,6 +4,7 @@
   import { ui } from "../lib/commands.svelte";
   import { ws } from "../lib/workspace.svelte";
   import type { Engine, TexFlavor } from "../lib/types";
+  import { APP_VERSION } from "../lib/about";
 
   const p = $derived(ws.project);
 
@@ -111,6 +112,9 @@
         {/if}
       </section>
     {/if}
+    <footer>
+      <button class="about" onclick={() => { ui.settings = false; ui.about = true; }}>About KernTeX {APP_VERSION}</button>
+    </footer>
   </div>
 </Modal>
 
@@ -218,6 +222,21 @@
   .engines {
     font-size: 12px;
     margin: 8px 0 0;
+  }
+  footer {
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .about {
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--accent);
+    cursor: pointer;
+    font: inherit;
+  }
+  .about:hover {
+    text-decoration: underline;
   }
   .mono {
     font-family: var(--font-mono);
