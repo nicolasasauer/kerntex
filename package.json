@@ -10,7 +10,8 @@
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "tauri": "tauri",
-    "setup:tectonic": "node scripts/fetch-tectonic.mjs"
+    "setup:tectonic": "node scripts/fetch-tectonic.mjs",
+    "test:scripts": "node --test scripts/fetch-tectonic.test.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.0",

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b5bdb"/>
+      <stop offset="1" stop-color="#1c2f8a"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
+  <!-- a stylised "K" built from a stem and a kernel/seed shape -->
+  <rect x="300" y="250" width="110" height="524" rx="40" fill="#ffffff"/>
+  <path d="M430 512 L640 262 Q660 240 690 250 L748 268 Q770 278 755 300 L560 512 L755 724 Q770 746 748 756 L690 774 Q660 784 640 762 Z" fill="#ffffff"/>
+  <circle cx="700" cy="512" r="58" fill="#ffd43b"/>
+</svg>

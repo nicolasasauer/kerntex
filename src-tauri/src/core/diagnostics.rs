@@ -49,13 +49,22 @@ pub fn parse_tectonic(output: &str) -> Vec<Diagnostic> {
         let mut message = rest.to_string();
         let mut j = i + 1;
         while j < lines.len() && lines[j].starts_with("    ") && !lines[j].trim().is_empty() {
+            if let Some(cause) = lines[j].trim().strip_prefix("caused by: ") {
+                message = format!("{message}: {cause}");
+            }
             j += 1;
         }
         if let Some((file, ln, msg)) = split_file_line(rest) {
             message = msg.to_string();
             push(&mut out, severity, source_for(&message, "LaTeX"), Some(file), Some(ln), message);
         } else if !is_tectonic_noise(&message) {
-            let source = if message.contains("biber") { "Biber" } else if message.contains("bibtex") { "BibTeX" } else { "Tectonic" };
+            let source = if message.contains("biber") {
+                "Biber"
+            } else if message.contains("bibtex") {
+                "BibTeX"
+            } else {
+                "Tectonic"
+            };
             push(&mut out, severity, source.to_string(), None, None, message);
         }
         i = j;
@@ -74,6 +83,10 @@ pub fn parse_tex_log(log: &str) -> Vec<Diagnostic> {
 
         // `./main.tex:12: Undefined control sequence.`
         if let Some((file, ln, msg)) = split_file_line(line) {
+            if is_tex_noise(msg) {
+                i += 1;
+                continue;
+            }
             let mut message = msg.trim_end_matches('.').to_string();
             // Append the offending source snippet (`l.12 \foo`) when present.
             if let Some(ctx) = lines[i + 1..].iter().take(8).find(|l| l.starts_with(&format!("l.{ln} "))) {
@@ -89,7 +102,8 @@ pub fn parse_tex_log(log: &str) -> Vec<Diagnostic> {
 
         // `! LaTeX Error: ...` (no file:line form, e.g. before the first file opened)
         if let Some(msg) = line.strip_prefix("! ") {
-            let ln = lines[i + 1..].iter().take(10).find_map(|l| l.strip_prefix("l.").and_then(|r| r.split_whitespace().next()?.parse().ok()));
+            let ln =
+                lines[i + 1..].iter().take(10).find_map(|l| l.strip_prefix("l.").and_then(|r| r.split_whitespace().next()?.parse().ok()));
             if !is_tex_noise(msg) {
                 push(&mut out, Severity::Error, source_for(msg, "LaTeX"), files.current(), ln, msg.trim_end_matches('.').to_string());
             }
@@ -114,7 +128,11 @@ pub fn parse_tex_log(log: &str) -> Vec<Diagnostic> {
             }
             let ln = extract_input_line(&message);
             let message = strip_input_line(&message);
-            let severity = if message.contains("may have changed") || message.contains("Rerun") { Severity::Info } else { Severity::Warning };
+            let severity = if ["may have changed", "Rerun", "fall-back bibtex backend"].iter().any(|k| message.contains(k)) {
+                Severity::Info
+            } else {
+                Severity::Warning
+            };
             push(&mut out, severity, source, files.current(), ln, message);
             files.scan(line);
             i = j;
@@ -123,7 +141,10 @@ pub fn parse_tex_log(log: &str) -> Vec<Diagnostic> {
 
         // Overfull / underfull boxes.
         if line.starts_with("Overfull \\") || line.starts_with("Underfull \\") {
-            let ln = line.split("at lines ").nth(1).or_else(|| line.split("at line ").nth(1))
+            let ln = line
+                .split("at lines ")
+                .nth(1)
+                .or_else(|| line.split("at line ").nth(1))
                 .and_then(|r| r.split(|c: char| !c.is_ascii_digit()).next()?.parse().ok());
             let severity = if line.starts_with("Overfull") { Severity::Warning } else { Severity::Info };
             let message = line.split(" in paragraph").next().unwrap_or(line).split(" detected at").next().unwrap_or(line).to_string();
@@ -258,14 +279,32 @@ fn is_tectonic_noise(msg: &str) -> bool {
         || msg.starts_with("an error occurred while processing")
 }
 
+/// Follow-up messages that only repeat that TeX gave up after a real error.
 fn is_tex_noise(msg: &str) -> bool {
-    msg.starts_with("Emergency stop") || msg.starts_with("==> Fatal error") || msg.starts_with(" ==> Fatal error")
+    let m = msg.trim_start();
+    m.starts_with("Emergency stop") || m.starts_with("==> Fatal error") || m.starts_with("*** (job aborted")
+}
+
+fn is_network_error(m: &str) -> bool {
+    let l = m.to_lowercase();
+    [
+        "error sending request",
+        "failed to lookup address",
+        "dns error",
+        "connection refused",
+        "network is unreachable",
+        "timed out",
+        "tcp connect error",
+        "could not resolve host",
+    ]
+    .iter()
+    .any(|k| l.contains(k))
 }
 
 /// Plain-language explanations for the most common problems.
 pub fn hint_for(msg: &str) -> Option<String> {
     let m = msg;
-    let quoted = || -> String {
+    let quoted = || -> Option<String> {
         // Text between `…' or "…"
         let start = m.find('`').or_else(|| m.find('"')).map(|i| i + 1)?;
         let end = m[start..].find(['\'', '"']).map(|e| start + e)?;
@@ -274,7 +313,8 @@ pub fn hint_for(msg: &str) -> Option<String> {
     .unwrap_or_default();
 
     let hint = if m.contains("Undefined control sequence") {
-        "This command isn't defined. Check its spelling, or load the package that provides it with \\usepackage{…} in the preamble.".to_string()
+        "This command isn't defined. Check its spelling, or load the package that provides it with \\usepackage{…} in the preamble."
+            .to_string()
     } else if m.contains("Missing $ inserted") {
         "Math-only content (e.g. ^, _ or \\alpha) appears outside math mode. Wrap it in $…$, or write the character literally as \\_ or \\^{}.".to_string()
     } else if (m.contains("File `") || m.contains("file `")) && m.contains("not found") || m.contains("I can't find file") {
@@ -285,13 +325,15 @@ pub fn hint_for(msg: &str) -> Option<String> {
     } else if m.contains("Environment") && m.contains("undefined") {
         "This environment doesn't exist. Check the spelling in \\begin{…}, or load the package that defines it.".to_string()
     } else if m.contains("ended by \\end{") || m.contains("\\begin{document} ended by") {
-        "\\begin and \\end don't match. Every \\begin{x} must be closed by \\end{x}, and nested environments must close in reverse order.".to_string()
+        "\\begin and \\end don't match. Every \\begin{x} must be closed by \\end{x}, and nested environments must close in reverse order."
+            .to_string()
     } else if m.contains("Runaway argument") || m.contains("Paragraph ended before") || m.contains("File ended while scanning") {
         "An opening brace { (or bracket) is never closed. Look just before the reported line for a missing }.".to_string()
     } else if m.contains("Too many }'s") || m.contains("Extra }") {
         "There's a closing brace } without a matching {. Remove it or add the missing opening brace.".to_string()
     } else if m.contains("Extra alignment tab") {
-        "A table row has more & separators than the column specification allows. Add a column to \\begin{tabular}{…} or remove an &.".to_string()
+        "A table row has more & separators than the column specification allows. Add a column to \\begin{tabular}{…} or remove an &."
+            .to_string()
     } else if m.contains("Misplaced alignment tab") {
         "& is only allowed inside tables and alignments. Write \\& for a literal ampersand.".to_string()
     } else if m.contains("Citation") && m.contains("undefined") {
@@ -301,9 +343,11 @@ pub fn hint_for(msg: &str) -> Option<String> {
     } else if m.contains("multiply defined") || m.contains("multiply-defined") {
         "The same \\label is used more than once. Give every label a unique name.".to_string()
     } else if m.starts_with("Overfull \\hbox") {
-        "A line sticks out into the margin. Rephrase it, allow hyphenation (e.g. long URLs with \\url{…}), or load \\usepackage{microtype}.".to_string()
+        "A line sticks out into the margin. Rephrase it, allow hyphenation (e.g. long URLs with \\url{…}), or load \\usepackage{microtype}."
+            .to_string()
     } else if m.starts_with("Underfull") {
-        "A line or page is stretched more than LaTeX likes. Usually harmless; often caused by \\\\ or \\newline at the end of a paragraph.".to_string()
+        "A line or page is stretched more than LaTeX likes. Usually harmless; often caused by \\\\ or \\newline at the end of a paragraph."
+            .to_string()
     } else if m.contains("not set up for use with LaTeX") || m.contains("Invalid UTF-8") {
         "A special Unicode character can't be typeset with pdfLaTeX. Replace it with a LaTeX command, or switch the engine to XeLaTeX/LuaLaTeX (Tectonic supports Unicode natively).".to_string()
     } else if m.contains("Font") && m.contains("not found") || m.contains("The font") && m.contains("cannot be found") {
@@ -316,13 +360,18 @@ pub fn hint_for(msg: &str) -> Option<String> {
         "\\\\ or \\newline is used where there is no line, e.g. right after a paragraph break. Remove it, or use \\vspace{…} for extra space.".to_string()
     } else if m.contains("Float(s) lost") || m.contains("Not in outer par mode") {
         "A figure or table is placed somewhere floats aren't allowed (e.g. inside a minipage or another float). Move it out, or use [H] from the float package.".to_string()
+    } else if m.contains("fall-back bibtex backend") {
+        "biblatex uses BibTeX instead of Biber here. That's fine for most documents (and what the built-in Tectonic engine supports); install Biber and remove `backend=bibtex` if you need Biber-only features.".to_string()
     } else if m.contains("Label(s) may have changed") || m.contains("Rerun") {
         "Cross-references changed. KernTeX re-runs automatically; if it persists, compile once more.".to_string()
     } else if m.contains("I didn't find a database entry") {
         let key = if quoted.is_empty() { String::new() } else { format!(" for “{quoted}”") };
         format!("Your .bib file has no entry{key}. Check the citation key and that the right .bib file is referenced.")
     } else if m.contains("I couldn't open database file") || m.contains("Cannot find") && m.contains(".bib") {
-        "The .bib file couldn't be found. Check the name in \\bibliography{…} / \\addbibresource{…} (path relative to the main file).".to_string()
+        "The .bib file couldn't be found. Check the name in \\bibliography{…} / \\addbibresource{…} (path relative to the main file)."
+            .to_string()
+    } else if is_network_error(m) {
+        "Tectonic needs an internet connection to download TeX packages — always on the first compile, and later whenever a document uses a package it hasn't downloaded yet. Connect to the internet and compile again; afterwards it works offline.".to_string()
     } else if m.contains("Missing number") {
         "LaTeX expected a number or length here (e.g. 2cm or 0.5\\textwidth). Check the arguments near the reported line.".to_string()
     } else if m.contains("Illegal unit of measure") {
@@ -429,6 +478,34 @@ mod tests {
         let (f, l, m) = split_file_line("C:/Users/n/thesis.tex:42: Missing $ inserted").unwrap();
         assert_eq!((f.as_str(), l, m), ("C:/Users/n/thesis.tex", 42, "Missing $ inserted"));
         assert!(split_file_line("note: 12: nothing").is_none());
+    }
+
+    #[test]
+    fn tectonic_offline() {
+        let d = parse_tectonic("error: failed to fetch https://relay.fullyjustified.net/default_bundle.tar\n    caused by: error sending request for url\nerror: error sending request for url (https://relay.fullyjustified.net/): dns error\n");
+        assert!(d.iter().any(|d| d.hint.as_deref().is_some_and(|h| h.contains("internet connection"))));
+    }
+
+    #[test]
+    fn bib_logs() {
+        let d = parse_bib_log("Warning--I didn't find a database entry for \"nokey\"\n", false);
+        assert_eq!(d[0].source, "BibTeX");
+        assert!(d[0].hint.as_deref().unwrap().contains("“nokey”"));
+        let d = parse_bib_log("INFO - This is Biber 2.19\n[12] Utils.pm:410> WARN - I didn't find a database entry for 'x' (section 0)\n[13] ERROR - Cannot find 'refs.bib'!\n", true);
+        assert_eq!(d[0].severity, Severity::Error);
+        assert_eq!(d[0].source, "Biber");
+        assert!(d[0].hint.as_deref().unwrap().contains(".bib file couldn't be found"));
+    }
+
+    #[test]
+    fn missing_package_without_noise() {
+        // Real pdfLaTeX log excerpt (-file-line-error).
+        let log = "(./main.tex\nLaTeX2e <2023-11-01>\n! LaTeX Error: File `nonexistentpkg.sty' not found.\n\nType X to quit or <RETURN> to proceed,\nor enter new name. (Default extension: sty)\n\nEnter file name: \n./main.tex:3: Emergency stop.\n<read *> \n         \nl.3 \\begin\n             {document}\n*** (cannot \\read from terminal in nonstop modes)\n\n./main.tex:3:  ==> Fatal error occurred, no output PDF file produced!\n";
+        let d = parse_tex_log(log);
+        assert_eq!(d.len(), 1, "{d:?}");
+        assert!(d[0].message.contains("nonexistentpkg.sty"));
+        assert_eq!(d[0].file.as_deref(), Some("main.tex"));
+        assert_eq!(d[0].line, Some(3));
     }
 
     #[test]

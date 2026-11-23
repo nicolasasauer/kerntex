@@ -7,9 +7,12 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 fn zip_err(action: &str, path: &Path, e: impl std::fmt::Display) -> AppError {
-    AppError::new(ErrorSource::Archive, format!("Couldn't {action} “{}”", path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()))
-        .detail(e.to_string())
-        .hint("Make sure it's a regular, complete .zip file (re-download it if unsure). Password-protected or split archives aren't supported.")
+    AppError::new(
+        ErrorSource::Archive,
+        format!("Couldn't {action} “{}”", path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()),
+    )
+    .detail(e.to_string())
+    .hint("Make sure it's a regular, complete .zip file (re-download it if unsure). Password-protected or split archives aren't supported.")
 }
 
 /// Extracts `zip_path` into a new folder inside `dest_parent` and returns it.
@@ -19,9 +22,7 @@ pub fn import_zip(zip_path: &Path, dest_parent: &Path) -> Result<PathBuf> {
     let file = File::open(zip_path).map_err(|e| AppError::io("open", zip_path, e))?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| zip_err("read", zip_path, e))?;
 
-    let names: Vec<PathBuf> = (0..archive.len())
-        .filter_map(|i| archive.by_index(i).ok()?.enclosed_name())
-        .collect();
+    let names: Vec<PathBuf> = (0..archive.len()).filter_map(|i| archive.by_index(i).ok()?.enclosed_name()).collect();
     let strip = common_root(&names);
 
     let stem = zip_path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "project".into());
@@ -90,6 +91,18 @@ pub fn export_zip(root: &Path, dest: &Path, clean: bool) -> Result<usize> {
                 continue;
             }
             if path.is_dir() {
+                if name == BUILD_DIR && !clean {
+                    // Keep per-project settings with the project, but never build output.
+                    let settings = path.join(super::settings::SETTINGS_FILE);
+                    if settings.is_file() {
+                        zip.start_file(format!("{BUILD_DIR}/{}", super::settings::SETTINGS_FILE), opts)
+                            .map_err(|e| zip_err("write", dest, e))?;
+                        let mut f = File::open(&settings).map_err(|e| AppError::io("read", &settings, e))?;
+                        io::copy(&mut f, &mut zip).map_err(|e| AppError::io("write", dest, e))?;
+                        count += 1;
+                    }
+                    continue;
+                }
                 if [".git", BUILD_DIR, "node_modules"].contains(&name.as_str()) {
                     continue;
                 }
@@ -125,7 +138,10 @@ mod tests {
         project::write_text(&src, "img/a.txt", "x").unwrap();
         project::write_text(&src, ".kerntex/out/main.pdf", "x").unwrap();
         let z = base.join("proj.zip");
+        project::write_text(&src, ".kerntex/project.json", "{}").unwrap();
         assert_eq!(export_zip(&src, &z, true).unwrap(), 3);
+        let full = base.join("full.zip");
+        assert_eq!(export_zip(&src, &full, false).unwrap(), 5, "main.tex, main.aux, main.bbl, img/a.txt, .kerntex/project.json");
 
         let dest = import_zip(&z, &base).unwrap();
         assert_eq!(dest.file_name().unwrap(), "proj");
