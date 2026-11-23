@@ -25,7 +25,7 @@
   <div class="inner">
     <header>
       <h1>KernTeX</h1>
-      <p class="muted">Write LaTeX locally — with a live PDF, clear errors and nothing else to install.</p>
+      <p class="muted">Write LaTeX and Typst locally — with a live PDF, clear errors and nothing else to install.</p>
     </header>
 
     <div class="actions">
@@ -48,6 +48,11 @@
         <span><b>Example project</b><small>A guided tour of LaTeX</small></span>
       </button>
     </div>
+
+    <p class="typst-hint muted">
+      New to LaTeX or curious about something simpler?
+      <button onclick={() => ws.openWelcome(false, "typst")}>Take the Typst tour</button> — a modern alternative that compiles instantly.
+    </p>
 
     <section class="recent">
       <h2>Recent projects</h2>
@@ -147,6 +152,22 @@
   .action small {
     color: var(--text-muted);
     font-size: 12px;
+  }
+  .typst-hint {
+    margin: 14px 2px 0;
+    font-size: 13px;
+  }
+  .typst-hint button {
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--accent);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+  }
+  .typst-hint button:hover {
+    text-decoration: underline;
   }
   .recent {
     margin-top: 34px;

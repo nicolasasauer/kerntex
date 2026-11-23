@@ -7,7 +7,7 @@
 [![CI](https://github.com/nicolasasauer/kerntex/actions/workflows/ci.yml/badge.svg)](https://github.com/nicolasasauer/kerntex/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-A fast, modern, local LaTeX editor — file tree, editor and live PDF side by side, with clear error messages and a built-in TeX engine. No account, no cloud, nothing else to install. **Written in Rust.**
+A fast, modern, local LaTeX and Typst editor — file tree, editor and live PDF side by side, with clear error messages and built-in engines. No account, no cloud, nothing else to install. **Written in Rust.**
 
 <p align="center">
   <img src="docs/screenshots/light.png" alt="KernTeX in light mode" width="49%">
@@ -33,6 +33,7 @@ No TeX installation needed: KernTeX ships with [Tectonic](https://tectonic-types
 - **Smart completion** — commands, environments, `\ref{` with all labels of the project and `\cite{` with all keys from your `.bib` files.
 - **Command palette** (`Ctrl+K`) with every action and its shortcut.
 - **Light and dark mode**, following your system by default. Respects “reduce motion”.
+- **LaTeX and Typst** — write classic LaTeX, or try [Typst](https://typst.app), a modern alternative with simpler markup that compiles in milliseconds. Both engines are built in; Typst errors are underlined exactly where they are. New projects let you pick the format; *Take the Typst tour* on the start screen shows what it can do.
 - **Images in two clicks** — drag files onto the file tree (or *Add files…*), preview images and PDF figures, insert a ready-made `figure` with one click.
 - **Look under the hood** — *Build details* shows the engine and its version, the document class and every package with its version, plus links to the output folder and the full log. No log flood: it's there when you open it.
 - **Safe with your files** — atomic saves, autosave, deleting goes to the system trash, nothing is overwritten without asking. Build output lives in `.kerntex/out/`, keeping your folder clean.
@@ -67,6 +68,7 @@ KernTeX's core is **written in Rust**: file access with path protection, running
 | Core logic | **Rust** (`src-tauri/src/core/`) |
 | App shell | [Tauri 2](https://tauri.app) (Rust) — small installers, native WebView, low memory |
 | TeX engine | [Tectonic](https://tectonic-typesetting.github.io) (Rust + XeTeX), bundled; or your own TeX Live / MiKTeX via latexmk |
+| Typst engine | The [Typst](https://typst.app) compiler (Rust), built in as a library |
 | Interface | [Svelte 5](https://svelte.dev) + TypeScript, [CodeMirror 6](https://codemirror.net), [pdf.js](https://mozilla.github.io/pdf.js/) |
 
 ## Bring your Overleaf projects

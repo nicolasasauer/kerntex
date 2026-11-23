@@ -7,15 +7,35 @@
   import { pickFolder, parentDir } from "../lib/api";
   import type { Template } from "../lib/types";
 
-  const templates: { id: Template; name: string; desc: string }[] = [
-    { id: "article", name: "Article", desc: "Paper or short report with abstract" },
-    { id: "report", name: "Thesis / report", desc: "Chapters, table of contents" },
-    { id: "beamer", name: "Presentation", desc: "Beamer slides" },
-    { id: "letter", name: "Letter", desc: "Formal letter" },
-    { id: "blank", name: "Blank", desc: "Just the essentials" },
-  ];
+  type Format = "latex" | "typst";
+  const TEMPLATES: Record<Format, { id: Template; name: string; desc: string }[]> = {
+    latex: [
+      { id: "article", name: "Article", desc: "Paper or short report with abstract" },
+      { id: "report", name: "Thesis / report", desc: "Chapters, table of contents" },
+      { id: "beamer", name: "Presentation", desc: "Beamer slides" },
+      { id: "letter", name: "Letter", desc: "Formal letter" },
+      { id: "blank", name: "Blank", desc: "Just the essentials" },
+    ],
+    typst: [
+      { id: "typstArticle", name: "Article", desc: "Paper or short report with abstract" },
+      { id: "typstReport", name: "Thesis / report", desc: "Chapters, table of contents" },
+      { id: "typstSlides", name: "Presentation", desc: "16:9 slides" },
+      { id: "typstLetter", name: "Letter", desc: "Formal letter" },
+      { id: "typstBlank", name: "Blank", desc: "Just the essentials" },
+    ],
+  };
 
+  let format: Format = $state("latex");
   let template: Template = $state("article");
+  const templates = $derived(TEMPLATES[format]);
+
+  function setFormat(f: Format) {
+    if (f === format) return;
+    // Keep the same kind of document when switching format.
+    const i = TEMPLATES[format].findIndex((t) => t.id === template);
+    format = f;
+    template = TEMPLATES[f][Math.max(0, i)].id;
+  }
   let name = $state("My document");
   let parent = $state(settings.recent[0] ? parentDir(settings.recent[0].root) : "");
   let creating = $state(false);
@@ -39,6 +59,14 @@
 
 <Modal title="New project" width={560} onClose={() => (ui.newProject = false)}>
   <form class="body" onsubmit={(e) => { e.preventDefault(); create(); }}>
+    <div class="format" role="radiogroup" aria-label="Document format">
+      <button type="button" role="radio" aria-checked={format === "latex"} class:on={format === "latex"} onclick={() => setFormat("latex")}>
+        <b>LaTeX</b><small>The classic. Works with Overleaf, journals and arXiv.</small>
+      </button>
+      <button type="button" role="radio" aria-checked={format === "typst"} class:on={format === "typst"} onclick={() => setFormat("typst")}>
+        <b>Typst</b><small>Modern and simpler, compiles instantly.</small>
+      </button>
+    </div>
     <div class="grid" role="radiogroup" aria-label="Template">
       {#each templates as t}
         <button type="button" role="radio" aria-checked={template === t.id} class="tpl" class:on={template === t.id} onclick={() => (template = t.id)}>
@@ -73,6 +101,40 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
+  }
+  .format {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-2);
+  }
+  .format button {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: background var(--dur) var(--ease);
+  }
+  .format button:active {
+    transform: scale(0.99);
+  }
+  .format button.on {
+    background: var(--surface-raised);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+  }
+  .format small {
+    font-size: 12px;
+    color: var(--text-muted);
   }
   .grid {
     display: grid;

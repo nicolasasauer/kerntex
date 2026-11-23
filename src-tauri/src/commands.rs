@@ -32,6 +32,7 @@ pub async fn detect_engines() -> EngineStatus {
         tectonic_version: None,
         latexmk_version: None,
         tectonic_cache_dir: None,
+        typst_version: crate::core::typst_engine::TYPST_VERSION.into(),
     })
 }
 
@@ -133,6 +134,21 @@ pub async fn welcome_project(app: AppHandle, fresh: bool) -> Result<String> {
         })
         .map_err(|e| AppError::new(ErrorSource::FileSystem, "Couldn't find your Documents folder").detail(e.to_string()))?;
     blocking(move || templates::ensure_welcome(&docs, fresh).map(|p| p.display().to_string())).await
+}
+
+/// Creates (or reuses) the Typst tour in the user's Documents folder.
+#[tauri::command]
+pub async fn typst_welcome_project(app: AppHandle, fresh: bool) -> Result<String> {
+    let docs = documents_dir(&app)?;
+    blocking(move || templates::ensure_typst_welcome(&docs, fresh).map(|p| p.display().to_string())).await
+}
+
+fn documents_dir(app: &AppHandle) -> Result<PathBuf> {
+    let paths = app.path();
+    paths
+        .document_dir()
+        .or_else(|_| paths.home_dir().map(|h| if h.join("Documents").is_dir() { h.join("Documents") } else { h }))
+        .map_err(|e| AppError::new(ErrorSource::FileSystem, "Couldn't find your Documents folder").detail(e.to_string()))
 }
 
 #[tauri::command]

@@ -14,6 +14,11 @@ pub enum Template {
     Report,
     Beamer,
     Letter,
+    TypstBlank,
+    TypstArticle,
+    TypstReport,
+    TypstSlides,
+    TypstLetter,
 }
 
 impl Template {
@@ -24,11 +29,32 @@ impl Template {
             Template::Report => include_str!("../../templates/report.tex"),
             Template::Beamer => include_str!("../../templates/beamer.tex"),
             Template::Letter => include_str!("../../templates/letter.tex"),
+            Template::TypstBlank => include_str!("../../templates/typst/blank.typ"),
+            Template::TypstArticle => include_str!("../../templates/typst/article.typ"),
+            Template::TypstReport => include_str!("../../templates/typst/report.typ"),
+            Template::TypstSlides => include_str!("../../templates/typst/slides.typ"),
+            Template::TypstLetter => include_str!("../../templates/typst/letter.typ"),
+        }
+    }
+
+    fn main_name(self) -> &'static str {
+        match self {
+            Template::TypstBlank | Template::TypstArticle | Template::TypstReport | Template::TypstSlides | Template::TypstLetter => {
+                "main.typ"
+            }
+            _ => "main.tex",
         }
     }
 }
 
 pub const WELCOME_NAME: &str = "Welcome to KernTeX";
+pub const TYPST_WELCOME_NAME: &str = "Welcome to Typst";
+
+const TYPST_WELCOME_FILES: &[(&str, &[u8])] = &[
+    ("main.typ", include_bytes!("../../templates/typst-welcome/main.typ")),
+    ("references.bib", include_bytes!("../../templates/typst-welcome/references.bib")),
+    ("images/example.png", include_bytes!("../../templates/welcome/images/example.png")),
+];
 
 const WELCOME_FILES: &[(&str, &[u8])] = &[
     ("main.tex", include_bytes!("../../templates/welcome/main.tex")),
@@ -59,7 +85,7 @@ pub fn new_project(parent: &Path, name: &str, template: Template) -> Result<Path
         return Err(AppError::io("create the project", &root, std::io::ErrorKind::AlreadyExists.into()));
     }
     fs::create_dir_all(&root).map_err(|e| AppError::io("create the project", &root, e))?;
-    project::write_text(&root, "main.tex", template.main_tex())?;
+    project::write_text(&root, template.main_name(), template.main_tex())?;
     project::write_text(&root, ".gitignore", &gitignore())?;
     Ok(root)
 }
@@ -68,18 +94,27 @@ pub fn new_project(parent: &Path, name: &str, template: Template) -> Result<Path
 /// copy is left untouched (the user may have edited it) and simply returned;
 /// with `fresh`, a new copy is created next to it instead (`… 2`).
 pub fn ensure_welcome(parent: &Path, fresh: bool) -> Result<PathBuf> {
-    let mut root = parent.join(WELCOME_NAME);
-    if root.join("main.tex").is_file() {
+    write_example(parent, WELCOME_NAME, "main.tex", WELCOME_FILES, fresh)
+}
+
+/// Same as [`ensure_welcome`], for the Typst tour.
+pub fn ensure_typst_welcome(parent: &Path, fresh: bool) -> Result<PathBuf> {
+    write_example(parent, TYPST_WELCOME_NAME, "main.typ", TYPST_WELCOME_FILES, fresh)
+}
+
+fn write_example(parent: &Path, name: &str, main: &str, files: &[(&str, &[u8])], fresh: bool) -> Result<PathBuf> {
+    let mut root = parent.join(name);
+    if root.join(main).is_file() {
         if !fresh {
             return Ok(root);
         }
         let mut n = 2;
         while root.exists() {
-            root = parent.join(format!("{WELCOME_NAME} {n}"));
+            root = parent.join(format!("{name} {n}"));
             n += 1;
         }
     }
-    for (rel, bytes) in WELCOME_FILES {
+    for (rel, bytes) in files {
         let abs = project::resolve(&root, rel)?;
         if let Some(p) = abs.parent() {
             fs::create_dir_all(p).map_err(|e| AppError::io("create", p, e))?;
@@ -119,6 +154,32 @@ mod tests {
         assert_eq!(fs::read_to_string(w.join("main.tex")).unwrap(), "edited", "keeps user edits");
         let w2 = ensure_welcome(&base, true).unwrap();
         assert_eq!(w2.file_name().unwrap(), "Welcome to KernTeX 2");
+        fs::remove_dir_all(base).ok();
+    }
+
+    /// Every Typst template and the Typst tour must compile without errors
+    /// (no network: they use no packages).
+    #[test]
+    fn typst_templates_compile() {
+        use crate::core::compile::CancelHandle;
+        use crate::core::diagnostics::Severity;
+        let base = std::env::temp_dir().join(format!("kerntex-tpl-typst-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(&base).unwrap();
+        let mut roots = vec![ensure_typst_welcome(&base, false).unwrap()];
+        for (i, t) in [Template::TypstBlank, Template::TypstArticle, Template::TypstReport, Template::TypstSlides, Template::TypstLetter]
+            .into_iter()
+            .enumerate()
+        {
+            roots.push(new_project(&base, &format!("t{i}"), t).unwrap());
+        }
+        for root in roots {
+            let res = crate::core::typst_engine::compile(&root, "main.typ", &CancelHandle::default(), |_| {}).unwrap();
+            let problems: Vec<_> = res.diagnostics.iter().filter(|d| d.severity != Severity::Info).collect();
+            assert!(res.ok && res.pdf_path.is_some(), "{}: {problems:?}", root.display());
+            assert!(problems.is_empty(), "{}: {problems:?}", root.display());
+            assert_eq!(crate::core::project::open(&root).unwrap().main_file.as_deref(), Some("main.typ"));
+        }
         fs::remove_dir_all(base).ok();
     }
 }

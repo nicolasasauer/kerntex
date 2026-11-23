@@ -78,6 +78,8 @@ pub struct EngineStatus {
     pub latexmk_version: Option<String>,
     /// Where Tectonic caches downloaded packages.
     pub tectonic_cache_dir: Option<String>,
+    /// Version of the built-in Typst compiler.
+    pub typst_version: String,
 }
 
 /// Shared handle so a running build can be cancelled from another thread.
@@ -120,6 +122,7 @@ pub fn detect_engines() -> EngineStatus {
         latexmk: latexmk.map(|p| p.display().to_string()),
         tectonic_cache_ready: cache.as_ref().is_some_and(|d| d.read_dir().map(|mut r| r.next().is_some()).unwrap_or(false)),
         tectonic_cache_dir: cache.map(|d| d.display().to_string()),
+        typst_version: super::typst_engine::TYPST_VERSION.into(),
     }
 }
 

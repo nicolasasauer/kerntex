@@ -24,7 +24,7 @@ export type CompileStatus =
   | { state: "running"; stage: string; detail: string | null; startedAt: number; firstRun: boolean }
   | { state: "done"; result: CompileResult };
 
-const TEXT_EXT = /\.(tex|bib|sty|cls|txt|md|bbx|cbx|dtx|ins|ltx|cfg|def|bst|latexmkrc|tikz|csv|dat|json|yaml|yml|lua|py|r|m|gitignore)$/i;
+const TEXT_EXT = /\.(tex|typ|bib|sty|cls|txt|md|bbx|cbx|dtx|ins|ltx|cfg|def|bst|latexmkrc|tikz|csv|dat|json|yaml|yml|lua|py|r|m|gitignore)$/i;
 
 const PREVIEW_EXT = /\.(png|jpe?g|gif|svg|webp|bmp|pdf)$/i;
 
@@ -131,10 +131,15 @@ class Workspace {
     if (dir) await this.openProject(dir);
   }
 
-  async openWelcome(fresh = false) {
+  /** True when the main file is a Typst document (compiled by the built-in Typst). */
+  get isTypst(): boolean {
+    return /\.typ$/i.test(this.mainFile ?? "");
+  }
+
+  async openWelcome(fresh = false, kind: "latex" | "typst" = "latex") {
     try {
       this.busy = "Preparing example project…";
-      const root = await api.welcomeProject(fresh);
+      const root = kind === "typst" ? await api.typstWelcomeProject(fresh) : await api.welcomeProject(fresh);
       settings.welcomed = true;
       await this.openProject(root);
       toast({ kind: "info", source: "KernTeX", title: "Example project", body: `Saved in ${root}` }, 6000);

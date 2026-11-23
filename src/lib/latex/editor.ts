@@ -13,7 +13,8 @@ import { search, searchKeymap, highlightSelectionMatches } from "@codemirror/sea
 import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap, snippetCompletion, type CompletionContext, type Completion } from "@codemirror/autocomplete";
 import { linter, lintGutter, forceLinting, type Diagnostic as CmDiagnostic } from "@codemirror/lint";
 import { tags as t } from "@lezer/highlight";
-import { COMMANDS, ENVIRONMENTS, ENV_BODY } from "./completions";
+import { COMMANDS, ENVIRONMENTS, ENV_BODY, TYPST_FUNCTIONS } from "./completions";
+import { typst } from "./typst-mode";
 import { findMissingPackages, usepackageInsertPos, PACKAGE_INFO } from "./packages";
 import type { Diagnostic, ProjectRefs } from "../types";
 
@@ -29,6 +30,11 @@ export interface EditorHost {
 }
 
 const latex = StreamLanguage.define(stex);
+const typstLang = StreamLanguage.define(typst);
+
+function isTypst(path: string) {
+  return /\.typ$/i.test(path);
+}
 
 const highlight = HighlightStyle.define([
   { tag: t.tagName, color: "var(--syn-command)" },
@@ -41,6 +47,8 @@ const highlight = HighlightStyle.define([
   { tag: t.bracket, color: "var(--syn-bracket)" },
   { tag: t.string, color: "var(--syn-string)" },
   { tag: t.invalid, color: "var(--danger)" },
+  { tag: t.strong, fontWeight: "700" },
+  { tag: t.emphasis, fontStyle: "italic" },
 ]);
 
 const baseTheme = EditorView.theme({
@@ -76,6 +84,31 @@ const baseTheme = EditorView.theme({
   ".kx-pkg-tip": { padding: "8px 10px", fontFamily: "var(--font-ui)", fontSize: "13px", maxWidth: "380px" },
   ".kx-pkg-tip b": { fontFamily: "var(--font-mono)" },
 });
+
+/** Typst: `@` references (labels and citation keys) and `#` functions. */
+function typstCompletions(host: EditorHost) {
+  const fnOptions: Completion[] = TYPST_FUNCTIONS.map(([tpl, detail]) => {
+    const label = "#" + tpl.replace(/[([\s].*$/, "");
+    return snippetCompletion("#" + tpl.replace(/\{\}/g, "${}"), { label, detail, type: "function" });
+  });
+  return (ctx: CompletionContext) => {
+    const ref = ctx.matchBefore(/@[\w\-.:]*$/);
+    if (ref && (ref.from === 0 || !/\w/.test(ctx.state.sliceDoc(ref.from - 1, ref.from)))) {
+      const refs = host.getRefs();
+      return {
+        from: ref.from + 1,
+        validFor: /^[\w\-.:]*$/,
+        options: [
+          ...refs.labels.map((l) => ({ label: l.name, detail: `${l.file}:${l.line}`, type: "variable" })),
+          ...refs.citations.map((c) => ({ label: c.key, detail: c.title ?? c.kind, type: "text" })),
+        ],
+      };
+    }
+    const word = ctx.matchBefore(/#[a-zA-Z.]*$/);
+    if (!word || (word.from === word.to && !ctx.explicit)) return null;
+    return { from: word.from, validFor: /^#[a-zA-Z.]*$/, options: fnOptions };
+  };
+}
 
 /** Completions for \commands, \begin{env}, \ref{label}, \cite{key}. */
 function latexCompletions(host: EditorHost) {
@@ -139,6 +172,13 @@ function latexLinter(host: EditorHost, getPath: () => string) {
       const line = doc.line(d.line);
       // Underline the near-snippet if we can find it, else the whole line.
       let from = line.from, to = line.to;
+      if (d.column) {
+        // Exact position (Typst reports start and end).
+        from = Math.min(line.to, line.from + d.column - 1);
+        const endLine = d.endLine && d.endLine <= doc.lines ? doc.line(d.endLine) : line;
+        to = d.endColumn ? Math.min(endLine.to, endLine.from + d.endColumn - 1) : line.to;
+        if (to <= from) to = Math.min(doc.length, from + 1);
+      }
       const near = d.message.match(/near “(.+?)”/);
       if (near) {
         const i = line.text.indexOf(near[1].split(/\s/)[0]);
@@ -223,12 +263,12 @@ export function createEditor(parent: HTMLElement, host: EditorHost, opts: { font
   const fontC = new Compartment();
   const fontTheme = (px: number) => EditorView.theme({ ".cm-scroller": { fontSize: `${px}px` } });
 
-  const extensions = (): Extension[] => [
+  const extensions = (path: string): Extension[] => [
     lineNumbers(), highlightActiveLineGutter(), highlightSpecialChars(), history(), foldGutter(), drawSelection(), dropCursor(),
     EditorState.allowMultipleSelections.of(true), indentOnInput(), bracketMatching(), closeBrackets(), rectangularSelection(),
     highlightActiveLine(), highlightSelectionMatches(), search({ top: true }),
-    latex, syntaxHighlighting(highlight), baseTheme,
-    autocompletion({ override: [latexCompletions(host)], icons: false, activateOnTyping: true }),
+    isTypst(path) ? typstLang : latex, syntaxHighlighting(highlight), baseTheme,
+    autocompletion({ override: [isTypst(path) ? typstCompletions(host) : latexCompletions(host)], icons: false, activateOnTyping: true }),
     latexLinter(host, () => current), lintGutter(), packageHover,
     wrapC.of(opts.wrap ? EditorView.lineWrapping : []),
     fontC.of(fontTheme(opts.fontSize)),
@@ -241,7 +281,7 @@ export function createEditor(parent: HTMLElement, host: EditorHost, opts: { font
     }),
   ];
 
-  const view = new EditorView({ parent, state: EditorState.create({ doc: "", extensions: extensions() }) });
+  const view = new EditorView({ parent, state: EditorState.create({ doc: "", extensions: extensions("") }) });
   let lastOptions = { ...opts };
 
   function syncOptions(state: EditorState): EditorState {
@@ -253,7 +293,7 @@ export function createEditor(parent: HTMLElement, host: EditorHost, opts: { font
     open(path, text) {
       if (current) states.set(current, view.state);
       let st = states.get(path);
-      if (!st) st = EditorState.create({ doc: text, extensions: extensions() });
+      if (!st) st = EditorState.create({ doc: text, extensions: extensions(path) });
       current = path;
       view.setState(syncOptions(st));
       forceLinting(view);

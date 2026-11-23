@@ -47,6 +47,7 @@ export const commands: Command[] = [
   { id: "openFolder", title: "Open folder…", group: "Project", shortcut: "Mod+O", run: () => ws.openFolderDialog() },
   { id: "importZip", title: "Import ZIP (e.g. from Overleaf)…", group: "Project", run: () => ws.importZip() },
   { id: "example", title: "Open example project", group: "Help", run: () => ws.openWelcome() },
+  { id: "exampleTypst", title: "Open Typst example project", group: "Help", run: () => ws.openWelcome(false, "typst") },
   { id: "exampleFresh", title: "Open a fresh copy of the example project", group: "Help", run: () => ws.openWelcome(true) },
   { id: "closeProject", title: "Close project", group: "Project", when: hasProject, run: () => ws.closeProject() },
   { id: "newFile", title: "New file…", group: "File", when: hasProject, run: () => { settings.layout.treeOpen = true; ui.treeCreate = { dir: "", kind: "file" }; } },
