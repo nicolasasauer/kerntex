@@ -45,6 +45,8 @@ pub fn scan(root: &Path, tree: &[FileNode]) -> ProjectRefs {
         let Ok(text) = std::fs::read_to_string(&abs) else { continue };
         if rel.to_lowercase().ends_with(".bib") {
             refs.citations.extend(bib_entries(&text, &rel));
+        } else if rel.to_lowercase().ends_with(".typ") {
+            refs.labels.extend(typst_labels(&text, &rel));
         } else {
             refs.labels.extend(labels(&text, &rel));
         }
@@ -58,7 +60,7 @@ fn collect(nodes: &[FileNode], out: &mut Vec<String>) {
             collect(&n.children, out);
         } else {
             let l = n.name.to_lowercase();
-            if l.ends_with(".tex") || l.ends_with(".bib") || l.ends_with(".ltx") {
+            if l.ends_with(".tex") || l.ends_with(".bib") || l.ends_with(".ltx") || l.ends_with(".typ") {
                 out.push(n.path.clone());
             }
         }
@@ -143,6 +145,30 @@ fn field(entry: &str, name: &str) -> Option<String> {
     None
 }
 
+/// Typst labels: `<name>` after headings, figures, equations …
+pub fn typst_labels(text: &str, file: &str) -> Vec<LabelRef> {
+    let mut out = Vec::new();
+    for (i, line) in text.lines().enumerate() {
+        let code = line.split("//").next().unwrap_or(line);
+        let b = code.as_bytes();
+        let mut j = 0;
+        while j < b.len() {
+            if b[j] == b'<' {
+                let rest = &code[j + 1..];
+                let len = rest.find(|c: char| !(c.is_alphanumeric() || "-_.:".contains(c))).unwrap_or(rest.len());
+                // A label must be closed directly by '>' and start with a letter.
+                if len > 0 && rest[len..].starts_with('>') && rest.starts_with(|c: char| c.is_alphabetic()) {
+                    out.push(LabelRef { name: rest[..len].to_string(), file: file.to_string(), line: i as u32 + 1 });
+                    j += len + 2;
+                    continue;
+                }
+            }
+            j += 1;
+        }
+    }
+    out
+}
+
 fn strip_comment(line: &str) -> &str {
     let b = line.as_bytes();
     for i in 0..b.len() {
@@ -174,5 +200,12 @@ mod tests {
         assert_eq!(e[0].title.as_deref(), Some("The \\TeXbook"));
         assert_eq!(e[1].key, "lamport");
         assert_eq!(e[1].title.as_deref(), Some("LaTeX"));
+    }
+
+    #[test]
+    fn finds_typst_labels() {
+        let l = typst_labels("= Intro <sec:intro>\n$ a < b > c $\n#figure(image(\"x.png\")) <fig-x> // <commented>\n", "main.typ");
+        let names: Vec<_> = l.iter().map(|l| (l.name.as_str(), l.line)).collect();
+        assert_eq!(names, vec![("sec:intro", 1), ("fig-x", 3)]);
     }
 }

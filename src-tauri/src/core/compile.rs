@@ -84,7 +84,9 @@ pub struct EngineStatus {
 #[derive(Default, Clone)]
 pub struct CancelHandle {
     child: Arc<Mutex<Option<Child>>>,
-    canceled: Arc<AtomicBool>,
+    pub(super) canceled: Arc<AtomicBool>,
+    /// An in-process build (Typst) is running; it can't be killed, only abandoned.
+    pub(super) in_process: Arc<AtomicBool>,
 }
 
 impl CancelHandle {
@@ -95,11 +97,15 @@ impl CancelHandle {
             kill_tree(child);
             return true;
         }
+        if self.in_process.load(Ordering::SeqCst) {
+            self.canceled.store(true, Ordering::SeqCst);
+            return true;
+        }
         false
     }
 
     pub fn is_running(&self) -> bool {
-        self.child.lock().unwrap().is_some()
+        self.child.lock().unwrap().is_some() || self.in_process.load(Ordering::SeqCst)
     }
 }
 
@@ -188,6 +194,10 @@ pub fn find_in_path(name: &str) -> Option<PathBuf> {
 
 pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: impl FnMut(Progress) + Send) -> Result<CompileResult> {
     let root = PathBuf::from(&req.root);
+    if super::typst_engine::is_typst(&req.main_file) {
+        // Typst documents always use the built-in Typst compiler.
+        return super::typst_engine::compile(&root, &req.main_file, cancel, on_progress);
+    }
     let main_abs = project::resolve(&root, &req.main_file)?;
     if !main_abs.is_file() {
         return Err(AppError::new(ErrorSource::App, format!("Main file “{}” doesn't exist", req.main_file))
@@ -345,6 +355,9 @@ pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: imp
             source: label.clone(),
             file: None,
             line: None,
+            column: None,
+            end_line: None,
+            end_column: None,
             message: format!("{label} stopped with exit code {}", status.code().unwrap_or(-1)),
             hint: Some("KernTeX couldn't find a specific error message. Open “Raw log” at the bottom of the Problems panel to see the engine's full output.".into()),
         });
