@@ -1,6 +1,11 @@
 // Builds the Rust core (`native/`, which includes `../src-tauri/src/core`)
 // with cargo and bundles it with the app. `flutter run` / `flutter build`
 // call this automatically — no CMake or manual copying.
+//
+// Options (pubspec.yaml → hooks.user_defines.kerntex):
+//   cargo_profile: release (default, LTO) | fast (no LTO, for quick local builds)
+// Hooks run with a filtered environment; CARGO_* and RUSTUP_* pass through,
+// so CARGO_TARGET_DIR (e.g. a CI cache) is honoured.
 
 import 'dart:io';
 
@@ -26,14 +31,22 @@ void main(List<String> args) async {
       throw UnsupportedError('KernTeX core: no Rust target for ${code.targetOS}/${code.targetArchitecture}');
     }
     final manifest = input.packageRoot.resolve('native/Cargo.toml');
-    final targetDir = input.outputDirectoryShared.resolve('cargo/');
+    final profile = input.userDefines['cargo_profile'] ?? 'release';
+    if (profile is! String || !const {'release', 'fast'}.contains(profile)) {
+      throw const FormatException('hooks.user_defines.kerntex.cargo_profile must be "release" or "fast"');
+    }
+    final envTarget = Platform.environment['CARGO_TARGET_DIR'];
+    final targetDir = envTarget != null && envTarget.isNotEmpty
+        ? Directory(envTarget).absolute.uri.resolve('./')
+        : input.outputDirectoryShared.resolve('cargo/');
     final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '';
     final local = File('$home/.cargo/bin/cargo${Platform.isWindows ? '.exe' : ''}');
     final cargo = local.existsSync() ? local.path : 'cargo';
 
     final result = await Process.run(cargo, [
       'build',
-      '--release',
+      '--profile',
+      profile,
       '--locked',
       '--manifest-path',
       manifest.toFilePath(),
@@ -46,7 +59,7 @@ void main(List<String> args) async {
       throw Exception('cargo build failed (${result.exitCode}):\n${result.stderr}');
     }
 
-    final lib = targetDir.resolve('$triple/release/${code.targetOS.dylibFileName('kerntex_native')}');
+    final lib = targetDir.resolve('$triple/$profile/${code.targetOS.dylibFileName('kerntex_native')}');
     output.assets.code.add(CodeAsset(package: input.packageName, name: 'src/native.dart', linkMode: DynamicLoadingBundled(), file: lib));
 
     // Rebuild whenever the Rust sources, the shared core or its templates change.

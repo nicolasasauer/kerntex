@@ -32,10 +32,16 @@ flutter/
   cheap and callable while a build runs; `kt_pdf_render` returns an RGBA buffer.
   The JSON is exactly what the Tauri commands exchange, so both UIs speak the
   same protocol.
-* **No CMake glue.** `hook/build.dart` is a Dart build hook: `flutter run` and
-  `flutter build` compile the Rust crate with cargo for the target platform and
-  bundle `kerntex_native` automatically (Linux, Windows; macOS/Android targets are
-  mapped but untested).
+* **No CMake glue.** `hook/build.dart` is a Dart build hook (`package:hooks`
+  2.x / `code_assets` 2.x, stable since Dart 3.10, current in Dart 3.14):
+  `flutter run` and `flutter build` compile the Rust crate with cargo for the
+  target platform and bundle `kerntex_native` automatically (Linux, Windows;
+  macOS/Android targets are mapped but untested). `code_assets` checks that the
+  library was built for the target architecture. Hooks run with a filtered
+  environment, so options come from `pubspec.yaml` *user-defines*:
+  `cargo_profile: release` (LTO, what ships) or `fast` (no LTO, about half the
+  build time for local work). `CARGO_TARGET_DIR` passes through, which lets CI
+  cache the Rust build.
 * **The UI thread never blocks.** Two long-lived isolates call into Rust: one
   for builds and file-system work, one for PDF pages, so a running build never
   stalls scrolling.
@@ -155,6 +161,46 @@ Not (yet) ported from the Tauri app: command palette, drag & drop from the file
 manager, export ZIP, the missing-package card with one-click fixes. Not yet in
 the Flutter editor (CodeMirror has them): soft wrap (long lines scroll
 horizontally here), code folding, multiple cursors.
+
+## Rendering corpus
+
+Does the preview draw real documents correctly? `native/examples/corpus.rs`
+compiles public LaTeX and Typst documents with the KernTeX core and compares
+every page hayro draws with Poppler (`pdftoppm`), the renderer behind most
+Linux PDF viewers.
+
+```sh
+cd flutter/native
+cargo run --release --example corpus                 # all documents
+cargo run --release --example corpus -- --only typst # a subset
+```
+
+The documents are listed in `native/corpus/corpus.json` and fetched with git at
+pinned commits (nothing third-party is stored in this repository): the official
+Typst templates (IEEE paper, AMS article, book, newsletter with CeTZ drawings,
+letter), LaTeX's own documents (sample, user guide, LaTeX News, the amsmath
+guide), two Beamer talks, *The Not So Short Introduction to LaTeX*, 64 TikZ
+figures, and KernTeX's own two tours. Typst Universe packages are installed
+from the `typst/packages` repository, so no access to packages.typst.org is
+needed. A page counts as different where more than 5 % of its inked pixels
+differ by more than 80/255, ignoring anti-aliasing and one-pixel shifts. Output:
+`target/corpus/report.md` and side-by-side images (hayro | Poppler | red
+differences) of each document's least similar page. CI:
+`.github/workflows/corpus.yml` runs it with Tectonic, weekly and whenever the
+core or renderer changes, and shows the report as the job summary.
+
+Last local run (TeX Live 2023 via latexmk, 100 dpi): **79 documents, 221
+pages — 76 identical within tolerance, 2 flagged, 1 not compiled.**
+
+* All Typst documents and all LaTeX documents (sample2e, usrguide, LaTeX News,
+  amsldoc, both Beamer talks, the tours) match Poppler: mean difference ≤ 0.4 %.
+* The two flagged TikZ figures have the same content, but hayro draws
+  *hairlines* (strokes thinner than a pixel) darker than Poppler, which
+  thins them — visible in figures with hundreds of 0.1 pt lines. Both are
+  valid; noted for a possible renderer setting.
+* *lshort* needs LuaLaTeX, whose font database is incomplete in this
+  container's TeX Live; CI installs it properly.
+* Speed: hayro renders a page in 1–26 ms at 100 dpi (median ≈ 7 ms).
 
 ## Measurements
 

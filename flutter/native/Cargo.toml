@@ -10,7 +10,8 @@ publish = false
 
 [lib]
 name = "kerntex_native"
-crate-type = ["cdylib"]
+# rlib: lets examples (the rendering corpus) use the same code.
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -25,9 +26,20 @@ hayro = "0.7"
 dirs = "7"
 opener = "0.9"
 
+[dev-dependencies]
+# Already in the tree via hayro; used by the corpus example for diff images.
+image = { version = "0.25", default-features = false, features = ["png"] }
+
 [profile.release]
 codegen-units = 1
 lto = true
 opt-level = "s"
 panic = "abort"
 strip = true
+
+# Quick local builds: `hooks: user_defines: kerntex: cargo_profile: fast` in pubspec.yaml.
+[profile.fast]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true

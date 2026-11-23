@@ -16,7 +16,7 @@
 #[path = "../../../src-tauri/src/core/mod.rs"]
 pub mod core;
 
-mod pdf;
+pub mod pdf;
 
 use crate::core::compile::{self, CancelHandle, CompileRequest, Progress};
 use crate::core::error::{AppError, ErrorSource, Result};

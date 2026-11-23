@@ -49,6 +49,12 @@ pub struct Info {
     pages: Vec<[f32; 2]>,
 }
 
+impl Info {
+    pub fn page_count(&self) -> usize {
+        self.pages.len()
+    }
+}
+
 pub fn info(path: &Path) -> Option<Info> {
     let pdf = load(path)?;
     Some(Info { pages: pdf.pages().iter().map(|p| p.render_dimensions().into()).collect() })

@@ -32,6 +32,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       CARGO_TERM_COLOR: always
+      # The build hook honours this, so `flutter build` reuses the cached Rust build.
+      CARGO_TARGET_DIR: ${{ github.workspace }}/flutter/native/target
     steps:
       - uses: actions/checkout@v4
 

@@ -24,3 +24,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/logo.png
+
+# Options for hook/build.dart (the Rust core build).
+hooks:
+  user_defines:
+    kerntex:
+      # "release" (LTO, what ships) or "fast" (no LTO, quicker local builds).
+      cargo_profile: release

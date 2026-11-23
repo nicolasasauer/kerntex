@@ -1,0 +1,68 @@
+name: Rendering corpus
+
+# Compiles public LaTeX and Typst documents (pinned in flutter/native/corpus/
+# corpus.json) with the KernTeX core and compares every page the preview
+# renderer (hayro) draws with Poppler. The report is shown as the job summary;
+# side-by-side images of the least similar pages are uploaded as an artifact.
+
+on:
+  push:
+    branches: [main, flutter-ui]
+    paths: ["flutter/native/**", "src-tauri/src/core/**", ".github/workflows/corpus.yml"]
+  pull_request:
+    paths: ["flutter/native/**", "src-tauri/src/core/**", ".github/workflows/corpus.yml"]
+  schedule:
+    - cron: "17 4 * * 1" # weekly: new Tectonic bundles or package versions
+  workflow_dispatch:
+
+concurrency:
+  group: corpus-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  corpus:
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Poppler (reference renderer) and TeX Live for LuaLaTeX documents
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils latexmk texlive-luatex texlive-latex-extra texlive-pictures \
+            texlive-fonts-recommended texlive-fonts-extra texlive-science texlive-bibtex-extra lmodern
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: flutter/native
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Tectonic (the engine KernTeX ships)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node scripts/fetch-tectonic.mjs
+          echo "KERNTEX_TECTONIC=$(ls "$PWD"/src-tauri/binaries/tectonic-* | head -n1)" >> "$GITHUB_ENV"
+
+      - name: Run the corpus
+        working-directory: flutter/native
+        run: cargo run --release --example corpus
+
+      - name: Report
+        if: always()
+        run: cat flutter/native/target/corpus/report.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rendering-corpus
+          path: |
+            flutter/native/target/corpus/report.md
+            flutter/native/target/corpus/report.json
+            flutter/native/target/corpus/images
+          retention-days: 30
