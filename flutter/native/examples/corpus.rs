@@ -63,6 +63,9 @@ struct Doc {
     /// Force an engine (e.g. latexmk for LuaLaTeX documents, which Tectonic can't build).
     #[serde(default)]
     engine: Option<Engine>,
+    /// Why a document needs special handling (shown in the report).
+    #[serde(default)]
+    note: Option<String>,
 }
 
 /// A page is "different" where the grey levels differ by more than this.
@@ -193,7 +196,10 @@ fn main() {
         md += &format!(
             "| {} — {} | {} | {} | {:.0} | {:.2} % | {} | {} |\n",
             r.id,
-            r.what,
+            match &r.note {
+                Some(n) => format!("{} *({:?}: {n})*", r.what, r.engine),
+                None => r.what.clone(),
+            },
             r.error.as_deref().map(|e| format!("failed: {}", e.replace('|', "/"))).unwrap_or(format!("{:.1} s", r.compile_ms / 1000.0)),
             r.pages.len(),
             ms,
@@ -229,13 +235,23 @@ struct PageResult {
 struct DocResult {
     id: String,
     what: String,
+    engine: Engine,
+    note: Option<String>,
     error: Option<String>,
     compile_ms: f64,
     pages: Vec<PageResult>,
 }
 
 fn run(d: &Doc, work: &Path, engine: Engine, opts: &Opts, img_dir: &Path) -> DocResult {
-    let mut res = DocResult { id: d.id.clone(), what: d.what.clone(), error: None, compile_ms: 0.0, pages: Vec::new() };
+    let mut res = DocResult {
+        id: d.id.clone(),
+        what: d.what.clone(),
+        engine: d.engine.unwrap_or(engine),
+        note: d.note.clone(),
+        error: None,
+        compile_ms: 0.0,
+        pages: Vec::new(),
+    };
     print!("{:<40} ", d.id);
     let flavor = d.flavor.or_else(|| settings::build_hints(work, Some(&d.main)).flavor).unwrap_or(TexFlavor::Pdflatex);
     let req = CompileRequest { root: work.display().to_string(), main_file: d.main.clone(), engine: d.engine.unwrap_or(engine), flavor };

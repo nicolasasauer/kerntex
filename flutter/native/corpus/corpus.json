@@ -17,12 +17,12 @@
     { "id": "typst/kerntex-tour", "what": "KernTeX's Typst tour (created by the core, as in the app)", "source": "kerntex", "dir": "typst-welcome", "main": "main.typ" },
 
     { "id": "latex/sample2e", "what": "LaTeX's own sample document", "source": "latex2e", "dir": "base", "main": "sample2e.tex" },
-    { "id": "latex/usrguide", "what": "LaTeX for authors (team guide)", "source": "latex2e", "dir": "base/doc", "main": "usrguide.tex" },
-    { "id": "latex/ltnews36", "what": "LaTeX News 36: two columns, code, logos", "source": "latex2e", "dir": "base/doc", "main": "ltnews36.tex" },
+    { "id": "latex/usrguide", "what": "LaTeX for authors (team guide)", "source": "latex2e", "dir": "base/doc", "main": "usrguide.tex", "engine": "latexmk", "note": "needs a newer LaTeX kernel than Tectonic's package bundle has" },
+    { "id": "latex/ltnews36", "what": "LaTeX News 36: two columns, code, logos", "source": "latex2e", "dir": "base/doc", "main": "ltnews36.tex", "engine": "latexmk", "note": "needs a newer LaTeX kernel than Tectonic's package bundle has" },
     { "id": "latex/amsldoc", "what": "amsmath user guide: heavy mathematics", "source": "latex2e", "dir": "required/amsmath", "main": "amsldoc.tex" },
-    { "id": "latex/beamer-talk", "what": "Beamer conference talk", "source": "beamer", "dir": "doc/examples/a-conference-talk", "main": "beamerexample-conference-talk.tex" },
-    { "id": "latex/beamer-ornate", "what": "Beamer solution template", "source": "beamer", "dir": "doc/solutions/conference-talks", "main": "conference-ornate-20min.en.tex" },
-    { "id": "latex/lshort", "what": "The Not So Short Introduction to LaTeX (~150 pages)", "source": "lshort", "dir": "src", "main": "lshort.tex", "flavor": "lualatex", "engine": "latexmk" },
+    { "id": "latex/beamer-talk", "what": "Beamer conference talk", "source": "beamer", "dir": "doc/examples/a-conference-talk", "main": "beamerexample-conference-talk.tex", "engine": "latexmk", "note": "pdfLaTeX document (non-UTF-8 inputenc), which Tectonic's XeTeX can't build" },
+    { "id": "latex/beamer-ornate", "what": "Beamer solution template", "source": "beamer", "dir": "doc/solutions/conference-talks", "main": "conference-ornate-20min.en.tex", "engine": "latexmk", "note": "pdfLaTeX document (non-UTF-8 inputenc), which Tectonic's XeTeX can't build" },
+    { "id": "latex/lshort", "what": "The Not So Short Introduction to LaTeX (~150 pages)", "source": "lshort", "dir": "src", "main": "lshort.tex", "flavor": "lualatex", "engine": "latexmk", "note": "LuaLaTeX only; Tectonic has no LuaTeX" },
     { "id": "latex/kerntex-tour", "what": "KernTeX's LaTeX tour: bibliography, TikZ, listings (created by the core)", "source": "kerntex", "dir": "welcome", "main": "main.tex" },
     { "id": "tikz/*", "what": "TikZ figures (one document each)", "source": "tikz", "glob": "*/*.tex" }
   ]
