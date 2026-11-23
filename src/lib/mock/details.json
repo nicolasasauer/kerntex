@@ -1,5 +1,5 @@
 {
- "program": "This is XeTeX, Version 3.141592653-2.6-0.999996 (Tectonic)",
+ "program": "XeTeX engine built into Tectonic",
  "format": "LaTeX2e <2023-11-01> patch level 1",
  "documentClass": {
   "name": "article",

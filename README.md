@@ -30,6 +30,27 @@ No TeX installation needed: KernTeX ships with [Tectonic](https://tectonic-types
 - **Look under the hood** — *Build details* shows the engine and its version, the document class and every package with its version, plus links to the output folder and the full log. No log flood: it's there when you open it.
 - **Safe with your files** — atomic saves, autosave, deleting goes to the system trash, nothing is overwritten without asking. Build output lives in `.kerntex/out/`, keeping your folder clean.
 
+### A quick look
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/errors.png" alt="Problems panel with plain-language hints and a one-click fix for a missing package"></td>
+    <td width="50%"><img src="docs/screenshots/figures.png" alt="Image preview with Insert figure and Copy includegraphics buttons"></td>
+  </tr>
+  <tr>
+    <td><b>Errors you can act on.</b> Each problem names its source, file and line, and explains the fix. Missing packages are caught while you type and added with one click.</td>
+    <td><b>Images made easy.</b> Drag files onto the tree, preview them, and insert a ready-made figure at the cursor.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/build-details.png" alt="Build details: engine version, document class and the packages your document uses"></td>
+    <td><img src="docs/screenshots/palette.png" alt="Command palette in dark mode"></td>
+  </tr>
+  <tr>
+    <td><b>Under the hood, on request.</b> Build details show the engine, its version and every package with its version — no log flood.</td>
+    <td><b>Everything one shortcut away.</b> <kbd>Ctrl</kbd>+<kbd>K</kbd> finds every action, with its keyboard shortcut.</td>
+  </tr>
+</table>
+
 ## Bring your Overleaf projects
 
 KernTeX works on ordinary folders — there's no special project format.
