@@ -138,7 +138,10 @@ ThemeData buildTheme(Brightness b) {
     extensions: [k],
   );
   return base.copyWith(
-    textTheme: base.textTheme.apply(bodyColor: k.text, displayColor: k.text, fontSizeFactor: 0.93),
+    // Slightly denser text than Material's defaults (sizes are null in tests).
+    textTheme: base.textTheme.bodyMedium?.fontSize == null
+        ? base.textTheme.apply(bodyColor: k.text, displayColor: k.text)
+        : base.textTheme.apply(bodyColor: k.text, displayColor: k.text, fontSizeFactor: 0.93),
     tooltipTheme: TooltipThemeData(
       waitDuration: const Duration(milliseconds: 500),
       textStyle: TextStyle(color: k.surface, fontSize: 12),

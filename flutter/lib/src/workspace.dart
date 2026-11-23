@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'dialogs.dart';
-import 'editor/code_editor.dart';
+import 'editor/editor_view.dart';
 import 'native.dart';
 import 'pdf_view.dart';
 import 'state.dart';
@@ -19,7 +19,7 @@ class Workspace extends StatefulWidget {
 }
 
 class WorkspaceState extends State<Workspace> {
-  final _editors = <String, GlobalKey<CodeEditorState>>{};
+  final _editors = <String, GlobalKey<EditorViewState>>{};
   final _focus = <String, FocusNode>{};
   AppModel get m => widget.m;
 
@@ -117,9 +117,9 @@ class WorkspaceState extends State<Workspace> {
               : Builder(
                   builder: (context) {
                     final d = m.active!;
-                    final key = _editors.putIfAbsent(d.path, () => GlobalKey<CodeEditorState>());
+                    final key = _editors.putIfAbsent(d.path, () => GlobalKey<EditorViewState>());
                     final focus = _focus.putIfAbsent(d.path, () => FocusNode());
-                    return CodeEditor(key: key, controller: d.controller, fontSize: m.fontSize, focusNode: focus);
+                    return EditorView(key: key, doc: d.doc, fontSize: m.fontSize, focusNode: focus, source: m.completions);
                   },
                 ),
         ),
@@ -273,7 +273,7 @@ class _Tabs extends StatelessWidget {
         children: [
           for (final d in m.docs)
             ListenableBuilder(
-              listenable: d.controller,
+              listenable: d.doc,
               builder: (context, _) {
                 final on = d.path == m.activePath && m.previewPath == null;
                 return InkWell(
@@ -798,13 +798,11 @@ class _StatusBar extends StatelessWidget {
           const SizedBox(width: 16),
           if (a != null)
             ListenableBuilder(
-              listenable: a.controller,
+              listenable: a.doc,
               builder: (context, _) {
-                final sel = a.controller.selection;
-                if (!sel.isValid) return const SizedBox.shrink();
-                final line = a.controller.lineOf(sel.extentOffset);
-                final col = sel.extentOffset - a.controller.lineStarts[line] + 1;
-                return Text('Ln ${line + 1}, Col $col', style: TextStyle(color: k.muted, fontSize: 12));
+                final sel = a.doc.sel;
+                final n = sel.isEmpty ? '' : ' (${a.doc.selectedText.length} selected)';
+                return Text('Ln ${sel.head.line + 1}, Col ${sel.head.col + 1}$n', style: TextStyle(color: k.muted, fontSize: 12));
               },
             ),
         ],

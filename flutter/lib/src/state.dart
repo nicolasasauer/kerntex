@@ -4,7 +4,9 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
-import 'editor/code_controller.dart';
+import 'editor/completion.dart';
+import 'editor/document.dart';
+import 'editor/highlight.dart';
 import 'native.dart';
 
 class Node {
@@ -27,11 +29,13 @@ class Recent {
 }
 
 class Doc {
-  Doc(this.path, String text) : saved = text, controller = CodeController(text: text, lang: langFor(path));
+  Doc(this.path, String text) : doc = EditorDocument(text, langFor(path)) {
+    savedRevision = doc.revision;
+  }
   final String path;
-  String saved;
-  final CodeController controller;
-  bool get dirty => controller.text != saved;
+  final EditorDocument doc;
+  late int savedRevision;
+  bool get dirty => doc.revision != savedRevision;
   String get name => path.split('/').last;
 }
 
@@ -187,6 +191,7 @@ class AppModel extends ChangeNotifier {
       final existing = mainFile == null ? null : Core.now('pdfPath', {'root': root, 'mainFile': mainFile}) as String;
       pdfPath = existing;
       pdfVersion++;
+      unawaited(refreshRefs());
       if (mainFile != null) await openFile(mainFile!);
       notifyListeners();
       if (mainFile != null) unawaited(compile());
@@ -197,7 +202,7 @@ class AppModel extends ChangeNotifier {
 
   void _closeDocs() {
     for (final d in docs) {
-      d.controller.dispose();
+      d.doc.dispose();
     }
     docs.clear();
     activePath = previewPath = null;
@@ -224,8 +229,40 @@ class AppModel extends ChangeNotifier {
         for (final n in await Core.call('readTree', {'root': root}) as List) Node(n as Map<String, dynamic>),
       ];
       notifyListeners();
+      unawaited(refreshRefs());
     } catch (e) {
       fail(e);
+    }
+  }
+
+  /// What the editor completes from: labels, bib keys and files of the project.
+  final completions = CompletionSource();
+
+  Future<void> refreshRefs() async {
+    final r = root;
+    if (r == null) return;
+    final files = <String>[];
+    void walk(List<Node> ns) {
+      for (final n in ns) {
+        if (n.isDir) {
+          walk(n.children);
+        } else if (!n.generated) {
+          files.add(n.path);
+        }
+      }
+    }
+
+    walk(tree);
+    completions.files = files;
+    try {
+      final refs = await Core.quick('scanRefs', {'root': r}) as Map<String, dynamic>;
+      if (root != r) return;
+      completions.labels = [for (final l in refs['labels'] as List) (l['name'] as String, '${l['file']}:${l['line']}')];
+      completions.citations = [
+        for (final c in refs['citations'] as List) (c['key'] as String, (c['title'] as String?) ?? (c['kind'] as String? ?? '')),
+      ];
+    } catch (_) {
+      // Completion data is a convenience; a failed scan just means fewer suggestions.
     }
   }
 
@@ -297,15 +334,15 @@ class AppModel extends ChangeNotifier {
     final i = docs.indexOf(d);
     docs.remove(d);
     if (activePath == d.path) activePath = docs.isEmpty ? null : docs[i.clamp(0, docs.length - 1)].path;
-    d.controller.dispose();
+    d.doc.dispose();
     notifyListeners();
   }
 
   bool _write(Doc d) {
     try {
-      final text = d.controller.text;
-      Core.now('writeFile', {'root': root, 'path': d.path, 'content': text});
-      d.saved = text;
+      final rev = d.doc.revision;
+      Core.now('writeFile', {'root': root, 'path': d.path, 'content': d.doc.text});
+      d.savedRevision = rev;
       return true;
     } catch (e) {
       fail(e);
@@ -322,6 +359,7 @@ class AppModel extends ChangeNotifier {
 
   Future<void> save() async {
     await saveAll();
+    unawaited(refreshRefs());
     if (compileOnSave) await compile();
   }
 
@@ -343,7 +381,7 @@ class AppModel extends ChangeNotifier {
         if (d.path == from || d.path.startsWith('$from/')) {
           _write(d);
           docs.remove(d);
-          d.controller.dispose();
+          d.doc.dispose();
         }
       }
       if (mainFile == from) await setMain(to);
@@ -437,7 +475,7 @@ class AppModel extends ChangeNotifier {
 
   void _applyDiagnostics() {
     for (final d in docs) {
-      d.controller.setDiagnostics([
+      d.doc.setDiagnostics([
         for (final x in diagnostics)
           if (x['file'] == d.path) x,
       ]);

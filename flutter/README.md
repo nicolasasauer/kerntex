@@ -5,7 +5,7 @@ core** as the Tauri desktop app. It exists to answer a concrete question with
 numbers instead of opinions: *is Flutter leaner or faster than Tauri for
 KernTeX?* (Results [below](#measurements).)
 
-![KernTeX Flutter UI: Typst tour with a precise error underline and the PDF rendered by the Rust core](screenshot.png)
+![KernTeX Flutter UI: the Typst tour with project-wide @ completion, a precise error underline and the PDF rendered by the Rust core](screenshot.png)
 
 Nothing in `src-tauri/src/core` was changed for it; both apps compile the very
 same files.
@@ -19,7 +19,7 @@ flutter/
 │   └── src/
 │       ├── native.dart        FFI bindings + two worker isolates (build, render)
 │       ├── state.dart         one ChangeNotifier: project, tabs, build, settings
-│       ├── editor/            self-built code editor (highlighting, gutter, marks)
+│       ├── editor/            KernTeX's own code editor (see below)
 │       ├── pdf_view.dart      preview: pages rasterised by Rust, on-demand
 │       ├── workspace.dart     toolbar, file tree, tabs, problems, status bar
 │       ├── start_screen.dart  and dialogs.dart, theme.dart
@@ -44,16 +44,80 @@ flutter/
   resolution. hayro is already part of Typst's dependency tree, so this adds
   no code to the binary. One page renders at a time, the visible page first;
   only ~10 bitmaps stay in memory.
-* **Self-built editor.** `EditableText` with a fixed line height, so the gutter,
-  the active line and "jump to line" are plain arithmetic; the gutter paints
-  only visible line numbers. LaTeX, Typst and BibTeX highlighting is one linear
-  pass per edit. Diagnostics are underlined at the exact column (Typst) or line
-  (TeX). Tab/Shift+Tab indent, Enter keeps indentation, Ctrl+/ toggles
-  comments, undo/redo is built in.
+* **Its own editor**, built for LaTeX and Typst rather than wrapped around a
+  generic component — see [The editor](#the-editor).
 
 Dependencies beyond Flutter itself: `ffi`, `file_selector` (native file
 dialogs), `hooks`/`code_assets` (the build hook) — all published by the Dart and
 Flutter teams.
+
+## The editor
+
+`lib/src/editor/` — about 2 000 lines of Dart, no editor package.
+
+| File | What it does |
+|---|---|
+| `document.dart` | The text as a list of lines, selection, grouped undo/redo, diagnostics that move with the text, word and bracket logic |
+| `highlight.dart` | Line-by-line lexers for LaTeX, Typst and BibTeX with carried state (math mode, block comments, raw blocks, verbatim) |
+| `editor_view.dart` | Virtualised rendering, text input, keyboard and mouse |
+| `completion.dart` | Context-aware completion |
+| `find_bar.dart` | Find / replace |
+| `vocabulary.dart` | Commands, environments, Typst functions and packages — generated from the Tauri editor's data by `tool/gen_vocabulary.mjs` |
+
+**Why it is fast**
+
+* *Only the screen is laid out.* Each line caches its own `ui.Paragraph`; a
+  frame draws the ~40 visible ones. Scrolling never re-lays-out text, typing
+  re-lays-out one line. The cache is capped (800 lines), so paging through a
+  huge file keeps memory flat.
+* *Edits are local.* The document is a list of lines; typing changes one
+  string, Enter inserts one list entry. Nothing re-joins or re-scans the file.
+* *Highlighting is incremental.* After an edit only the changed lines are
+  re-lexed, plus following lines until one ends in the same state as before
+  (e.g. typing `$` re-lexes until the math mode settles).
+
+Measured (`flutter test`, 100 000-line LaTeX file): opening and highlighting
+≈ 100 ms; **≈ 11 µs per keystroke** including undo bookkeeping and
+re-highlighting.
+
+**Text input** goes through Flutter's own `TextInputClient` — the interface
+Flutter's text fields use — so keyboard layouts, dead keys, compose sequences
+and IMEs (Chinese, Japanese, emoji) work as in any Flutter app. The platform
+only ever sees the current line; the editor diffs what comes back and applies
+it as an edit. Tested in the real app: umlauts, ß, €, typographic quotes,
+漢字 and emoji.
+
+**What it does**
+
+* Selection with mouse (click, drag with auto-scroll, double-click word,
+  triple-click line, Shift+click) and keyboard (Shift+arrows, Ctrl+Shift+arrows,
+  Home/End, Page Up/Down, Ctrl+A, Ctrl+L)
+* Smart Home (indentation first), word-wise motion and deletion, soft tabs
+* Enter keeps the indentation, opens a block between brackets, and after
+  `\begin{env}` adds the matching `\end{env}`
+* Auto-closing `( [ {` (and `$` in Typst), typing over the closing bracket,
+  wrapping a selection, deleting an empty pair at once; matching bracket
+  highlighted
+* Tab / Shift+Tab indent and outdent, Ctrl+/ comment toggle, Alt+↑/↓ move
+  lines, Ctrl+Shift+K delete line, Ctrl+X/C on an empty selection cut/copy the
+  line
+* Undo/redo grouped like typing feels (a burst of typing is one step,
+  including inside auto-closed braces); "unsaved" is exact: undoing back to the
+  saved text clears it
+* Other occurrences of the selected word highlighted
+* Diagnostics: wavy underline at the exact span (Typst) or line (TeX), error
+  background, gutter dot — and they stay on their text while you edit above
+  them
+* **Completion** (as you type, or Ctrl+Space): LaTeX commands and your own
+  `\newcommand`s, environments with bodies (`\begin{figure}` → full figure
+  skeleton), `\ref`/`\cref`/… labels and `\cite`/`\parencite`/… keys from the
+  whole project, `\usepackage` names with descriptions, file names for
+  `\includegraphics`, `\input`, `\include`, `\addbibresource`; in Typst `#`
+  functions, `@` labels and citations, and file names for `#image`/`#include`/…
+* **Find / replace** (Ctrl+F, Ctrl+H, F3): match case, whole word, regular
+  expressions with `$1` groups in the replacement, "n of m", all matches
+  highlighted, replace all as one undo step
+* Right-click menu, IME candidate window placed at the caret
 
 ## Run it
 
@@ -80,16 +144,17 @@ Tectonic) and uploads them as artifacts.
 Start screen (new project from all LaTeX and Typst templates, open folder,
 import Overleaf ZIP, LaTeX example, Typst tour, recent projects) · file tree
 (new file/folder, add files, rename, trash, set main file, reveal) · tabs with
-unsaved markers · editor as above · compile with progress and Stop (Tectonic,
+unsaved markers · the editor above · compile with progress and Stop (Tectonic,
 latexmk, built-in Typst) · Problems with hints and jump-to-source · Build
 details (engine, document class, packages) · raw log (virtualised) · PDF
 preview with zoom (buttons, Ctrl+wheel) and page indicator · image and PDF file
 previews · export PDF · settings (theme, font size, compile on save, engines) ·
 About · light and dark theme · keyboard shortcuts as in the Tauri app.
 
-Not (yet) ported: command palette, autocomplete, find/replace, SyncTeX-free
-"jump from PDF", drag & drop from the file manager, export ZIP, the
-missing-package card with one-click fixes.
+Not (yet) ported from the Tauri app: command palette, drag & drop from the file
+manager, export ZIP, the missing-package card with one-click fixes. Not yet in
+the Flutter editor (CodeMirror has them): soft wrap (long lines scroll
+horizontally here), code folding, multiple cursors.
 
 ## Measurements
 
@@ -104,6 +169,7 @@ of the app's processes, measured 10 s after start.
 | Memory, fresh start | **377 MB** (98 + 258 + 21) | **312 MB** |
 | Memory after the LaTeX example, then the Typst tour | 636 MB in the WebKit web process alone | 342 MB |
 | Typst rebuild after an edit | ~0.0–0.1 s | ~0.0–0.1 s (same core) |
+| **100 000-line `.tex` (7 MB): open, page through 6 000 lines, type** | **+214 MB → 823 MB**, line numbers stopped rendering | **+30 MB → 362 MB** |
 | Linux download (without Tectonic) | 20.5 MB `.deb` (uses the system's WebKitGTK) | 28.5 MB `.tar.gz` (61 MB unpacked, engine included) |
 
 Of Flutter's 312 MB, about 46 MB is the software OpenGL stack (llvmpipe,
@@ -119,8 +185,10 @@ larger: about 8 MB more on Linux. On Windows the gap should be similar
 (Tauri's v0.1.3 installer was 15–23 MB before Typst); the CI artifacts show the
 Flutter size.
 
-The editor is the trade-off. CodeMirror (Tauri) virtualises the document and
-has a mature ecosystem: autocomplete, search and bracket matching come with it.
-The Flutter editor here is self-built and lays out the whole file on each edit,
-which is fine for typical documents (thousands of lines) but would need
-viewport-based rendering for very large ones.
+**The editor.** The first Flutter preview used a stock text field that laid
+out the whole file on every keystroke — the honest trade-off then was "CodeMirror
+is more mature". The editor here is virtualised like CodeMirror, covers the
+everyday editing of the Tauri editor (plus environment bodies, file-name
+completion and regex groups in replace, which that one lacks), and stays flat
+on huge files where the web view grows by hundreds of megabytes. Still to do:
+soft wrap, folding, multiple cursors.
