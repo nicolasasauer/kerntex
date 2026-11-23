@@ -11,3 +11,4 @@ pub mod project;
 pub mod refs;
 pub mod settings;
 pub mod templates;
+pub mod typst_engine;

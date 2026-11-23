@@ -14,6 +14,8 @@
 
   /** Packages named in the main file's preamble — the ones the author chose. */
   const direct = $derived.by(() => {
+    // Typst only reports the packages a document imports itself.
+    if (ws.isTypst) return new Set((d?.packages ?? []).map((p) => p.name));
     const main = ws.mainFile;
     const text = main ? ws.editor?.text(main) : null;
     return text ? loadedPackages(text).packages : new Set<string>();
@@ -22,6 +24,11 @@
   const engineVersion = $derived(
     ws.engine === "tectonic" ? ws.engines?.tectonicVersion : ws.engines?.latexmkVersion,
   );
+
+  function ctan(p: PackageRef) {
+    // Typst packages live on Typst Universe, LaTeX packages on CTAN.
+    return p.name.startsWith("@") ? `https://typst.app/universe/package/${p.name.split("/")[1]}` : `https://ctan.org/pkg/${p.name}`;
+  }
 
   function matches(p: PackageRef) {
     const q = filter.trim().toLowerCase();
@@ -84,7 +91,7 @@
         </div>
       </div>
       {#if shown.length === 0}
-        <p class="muted empty">{filter ? "No package matches." : "The document doesn't load any packages."}</p>
+        <p class="muted empty">{filter ? "No package matches." : ws.isTypst ? "The document doesn't import any Typst packages." : "The document doesn't load any packages."}</p>
       {:else}
         <table>
           <thead><tr><th>Package</th><th>Version</th><th>What it does</th><th></th></tr></thead>
@@ -94,7 +101,7 @@
                 <td class="mono name">{p.name}{#if !direct.has(p.name)}<span class="tag">dependency</span>{/if}</td>
                 <td class="mono muted">{ver(p)}</td>
                 <td>{PACKAGE_INFO[p.name] ?? p.description ?? ""}</td>
-                <td><button class="icon-btn" title="Documentation on CTAN" aria-label="{p.name} on CTAN" onclick={() => openUrl(`https://ctan.org/pkg/${p.name}`)}><ExternalLink size={13} /></button></td>
+                <td><button class="icon-btn" title="Documentation on CTAN" aria-label="{p.name} on CTAN" onclick={() => openUrl(ctan(p))}><ExternalLink size={13} /></button></td>
               </tr>
             {/each}
           </tbody>

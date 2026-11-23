@@ -179,7 +179,51 @@ pub fn detect_main(root: &Path, tree: &[FileNode]) -> Option<String> {
         }
     }
     // A candidate may itself point elsewhere via `% !TEX root = …`.
-    best.map(|(_, r)| settings::tex_root(root, &r).unwrap_or(r))
+    if let Some((_, r)) = best {
+        return Some(settings::tex_root(root, &r).unwrap_or(r));
+    }
+    detect_typst_main(root, tree)
+}
+
+/// Typst has no `\documentclass`: prefer conventional names and shallow
+/// files, and skip files other `.typ` files `#include`/`#import`.
+fn detect_typst_main(root: &Path, tree: &[FileNode]) -> Option<String> {
+    let mut candidates = Vec::new();
+    collect_ext(tree, ".typ", &mut candidates);
+    let texts: Vec<(String, String)> =
+        candidates.iter().filter_map(|rel| Some((rel.clone(), fs::read_to_string(resolve(root, rel).ok()?).ok()?))).collect();
+    let mut best: Option<(i32, String)> = None;
+    for (rel, text) in &texts {
+        let name = rel.rsplit('/').next().unwrap_or(rel);
+        let used_elsewhere =
+            texts.iter().any(|(other, t)| other != rel && (t.contains(&format!("\"{name}\"")) || t.contains(&format!("/{name}\""))));
+        let stem = name.trim_end_matches(".typ").to_lowercase();
+        let mut score = 0;
+        if used_elsewhere {
+            score -= 20;
+        }
+        if matches!(stem.as_str(), "main" | "thesis" | "paper" | "report" | "document" | "index") {
+            score += 5;
+        }
+        if text.contains("#set document") || text.contains("#set page") || text.contains("#show: ") {
+            score += 2;
+        }
+        score -= rel.matches('/').count() as i32 * 3;
+        if best.as_ref().map_or(true, |(s, _)| score > *s) {
+            best = Some((score, rel.clone()));
+        }
+    }
+    best.map(|(_, r)| r)
+}
+
+fn collect_ext(nodes: &[FileNode], ext: &str, out: &mut Vec<String>) {
+    for n in nodes {
+        if n.is_dir {
+            collect_ext(&n.children, ext, out);
+        } else if n.name.to_lowercase().ends_with(ext) {
+            out.push(n.path.clone());
+        }
+    }
 }
 
 /// True if `cmd` occurs outside a `%` comment.
@@ -400,5 +444,18 @@ mod tests {
         assert_eq!(unique_path(&root, "Makefile"), root.join("Makefile"));
         fs::remove_dir_all(root).ok();
         fs::remove_dir_all(outside).ok();
+    }
+
+    #[test]
+    fn detects_typst_main() {
+        let root = tmp();
+        write_text(&root, "chapters/intro.typ", "= Intro").unwrap();
+        write_text(&root, "report.typ", "#set page(paper: \"a4\")\n#include \"chapters/intro.typ\"").unwrap();
+        write_text(&root, "notes.typ", "scratch").unwrap();
+        assert_eq!(open(&root).unwrap().main_file.as_deref(), Some("report.typ"));
+        // LaTeX wins in mixed projects.
+        write_text(&root, "main.tex", "\\documentclass{article}\\begin{document}x\\end{document}").unwrap();
+        assert_eq!(open(&root).unwrap().main_file.as_deref(), Some("main.tex"));
+        fs::remove_dir_all(root).ok();
     }
 }

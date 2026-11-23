@@ -48,6 +48,10 @@ export interface Diagnostic {
   source: string;
   file: string | null;
   line: number | null;
+  /** 1-based exact position, where the engine reports it (Typst). */
+  column?: number;
+  endLine?: number;
+  endColumn?: number;
   message: string;
   hint: string | null;
 }
@@ -101,6 +105,7 @@ export interface EngineStatus {
   tectonicVersion: string | null;
   latexmkVersion: string | null;
   tectonicCacheDir: string | null;
+  typstVersion: string;
 }
 
 export interface LabelRef {
@@ -121,4 +126,6 @@ export interface ProjectRefs {
   citations: CiteRef[];
 }
 
-export type Template = "blank" | "article" | "report" | "beamer" | "letter";
+export type Template =
+  | "blank" | "article" | "report" | "beamer" | "letter"
+  | "typstBlank" | "typstArticle" | "typstReport" | "typstSlides" | "typstLetter";

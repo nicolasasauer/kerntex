@@ -24,7 +24,8 @@ All tracked as [GitHub issues](https://github.com/nicolasasauer/kerntex/issues),
 - **v0.4** — device sync and real-time collaboration via a self-hostable server (`kerntex-sync`)
 - **Microsoft Store** — MSIX package is built by the release workflow; see [docs/microsoft-store.md](microsoft-store.md)
 - **Android / tablet** — same app on Android tablets and phones (Tauri 2 supports Android). Goal: **compile on the device**, so no server is required. A self-hosted server (the v0.4 relay) is an optional extra for syncing and for devices that can't compile locally — never a requirement, and never a server you don't control.
-- **Later** — macOS, Typst, code signing, auto-update
+- **Typst** — stage 1 done (built-in compiler, templates, Typst tour, highlighting, exact error positions, `@`/`#` completion). Stage 2: completion and tooltips from Typst's own IDE support, live preview while typing, click in the PDF to jump to the source (#16)
+- **Later** — macOS, code signing, auto-update
 
 ## Done since v0.1 planning
 

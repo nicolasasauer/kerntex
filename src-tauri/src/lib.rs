@@ -27,6 +27,7 @@ pub fn run() {
             commands::tex_root,
             commands::new_project,
             commands::welcome_project,
+            commands::typst_welcome_project,
             commands::import_zip,
             commands::export_zip,
             commands::read_pdf,

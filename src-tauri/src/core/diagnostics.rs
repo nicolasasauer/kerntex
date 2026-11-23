@@ -25,6 +25,13 @@ pub struct Diagnostic {
     /// Project-relative file, if known.
     pub file: Option<String>,
     pub line: Option<u32>,
+    /// 1-based column and end position, where the engine reports them (Typst does).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub column: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_line: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_column: Option<u32>,
     pub message: String,
     /// Plain-language explanation and fix.
     pub hint: Option<String>,
@@ -184,7 +191,7 @@ pub fn parse_bib_log(log: &str, biber: bool) -> Vec<Diagnostic> {
 fn push(out: &mut Vec<Diagnostic>, severity: Severity, source: String, file: Option<String>, line: Option<u32>, message: String) {
     let file = file.map(|f| normalize_file(&f));
     let hint = hint_for(&message);
-    let d = Diagnostic { severity, source, file, line, message, hint };
+    let d = Diagnostic { severity, source, file, line, column: None, end_line: None, end_column: None, message, hint };
     if !out.contains(&d) {
         out.push(d);
     }
@@ -299,6 +306,29 @@ fn is_network_error(m: &str) -> bool {
     ]
     .iter()
     .any(|k| l.contains(k))
+}
+
+/// Plain-language help for common Typst messages that come without a hint.
+pub fn typst_hint(msg: &str) -> Option<String> {
+    let m = msg.to_lowercase();
+    let h = if m.starts_with("unknown variable") {
+        "This name isn't defined. Check the spelling, define it with #let, or import it (e.g. #import \"@preview/…\": name)."
+    } else if m.starts_with("expected") {
+        "Typst expected something else here — often a missing closing bracket, parenthesis or quote just before this spot."
+    } else if m.contains("unclosed delimiter") {
+        "A bracket, parenthesis or brace is opened but never closed. Add the closing counterpart."
+    } else if m.contains("file not found") {
+        "The file doesn't exist at this path. Paths are relative to the file that uses them; check the name and folder."
+    } else if m.contains("package not found") || m.contains("failed to download package") {
+        "Typst couldn't get this package. Check the name and version on typst.app/universe, and that you're online — packages are downloaded once and then cached."
+    } else if m.contains("label") && m.contains("does not exist") {
+        "No element has this label. Add <label> after the heading or figure you want to reference, or fix the spelling."
+    } else if m.contains("unknown font family") {
+        "This font isn't installed. Install it, or pick another font in #set text(font: \"…\")."
+    } else {
+        return None;
+    };
+    Some(h.to_string())
 }
 
 /// Plain-language explanations for the most common problems.

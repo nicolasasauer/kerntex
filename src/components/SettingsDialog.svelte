@@ -91,6 +91,12 @@
           <label for="pmain">Main file</label>
           <span class="mono">{ws.mainFile ?? "—"}</span>
         </div>
+        {#if ws.isTypst}
+          <div class="row">
+            <span>Engine</span>
+            <span>Typst {ws.engines?.typstVersion ?? ""} <small class="muted">built in — Typst documents always use it</small></span>
+          </div>
+        {:else}
         <div class="row">
           <label for="peng">Engine</label>
           <select id="peng" class="input" value={p.settings.engine ?? "default"} onchange={(e) => setProjectEngine(e.currentTarget.value)}>
@@ -109,6 +115,7 @@
               <option value="lualatex">LuaLaTeX</option>
             </select>
           </div>
+        {/if}
         {/if}
       </section>
     {/if}

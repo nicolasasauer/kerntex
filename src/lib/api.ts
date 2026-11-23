@@ -66,6 +66,7 @@ export const api = {
   texRoot: (root: string, path: string) => call<string | null>("tex_root", { root, path }),
   newProject: (parent: string, name: string, template: Template) => call<string>("new_project", { parent, name, template }),
   welcomeProject: (fresh: boolean) => call<string>("welcome_project", { fresh }),
+  typstWelcomeProject: (fresh: boolean) => call<string>("typst_welcome_project", { fresh }),
   importZip: (zip: string, destParent: string) => call<string>("import_zip", { zip, destParent }),
   exportZip: (root: string, dest: string, clean: boolean) => call<number>("export_zip", { root, dest, clean }),
   readPdf: (root: string, mainFile: string) => call<ArrayBuffer>("read_pdf", { root, mainFile }),
