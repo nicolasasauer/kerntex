@@ -200,7 +200,7 @@ pages — 76 identical within tolerance, 2 flagged, 1 not compiled.**
   valid; noted for a possible renderer setting.
 * *lshort* needs LuaLaTeX, whose font database is incomplete in this
   container's TeX Live; CI installs it properly.
-* Speed: hayro renders a page in 1–26 ms at 100 dpi (median ≈ 7 ms).
+* Speed: hayro renders a page at 100 dpi in a median 13 ms (0.5–266 ms; 8 pages in parallel).
 
 ## Measurements
 
