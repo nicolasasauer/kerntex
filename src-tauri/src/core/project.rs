@@ -265,6 +265,74 @@ pub fn trash(root: &Path, rel: &str) -> Result<()> {
     })
 }
 
+/// Largest file `read_bytes` hands to the UI (previews of images / PDF figures).
+pub const MAX_PREVIEW_BYTES: u64 = 64 * 1024 * 1024;
+
+/// Raw bytes of a project file, e.g. for an image preview.
+pub fn read_bytes(root: &Path, rel: &str) -> Result<Vec<u8>> {
+    let abs = resolve(root, rel)?;
+    let len = fs::metadata(&abs).map_err(|e| AppError::io("open", &abs, e))?.len();
+    if len > MAX_PREVIEW_BYTES {
+        return Err(AppError::new(ErrorSource::FileSystem, format!("“{rel}” is too large to preview"))
+            .detail(format!("{} MB", len / (1024 * 1024)))
+            .hint("Open it with another program via “Show in file manager”."));
+    }
+    fs::read(&abs).map_err(|e| AppError::io("open", &abs, e))
+}
+
+/// Copies files or folders from anywhere on disk into `dest_dir` (project-relative,
+/// "" = root). Never overwrites: name clashes become `name-2.ext`. Returns the
+/// new project-relative paths.
+pub fn import_files(root: &Path, dest_dir: &str, sources: &[PathBuf]) -> Result<Vec<String>> {
+    let dest = resolve(root, dest_dir)?;
+    if !dest.is_dir() {
+        return Err(AppError::new(ErrorSource::FileSystem, format!("“{dest_dir}” isn't a folder"))
+            .hint("Drop files onto a folder or the empty area of the file tree."));
+    }
+    let mut added = Vec::new();
+    for src in sources {
+        let name =
+            src.file_name().ok_or_else(|| AppError::new(ErrorSource::App, "Invalid file to add").detail(src.display().to_string()))?;
+        // Copying the project (or a parent) into itself would recurse forever.
+        if dest.starts_with(src) {
+            return Err(AppError::new(ErrorSource::FileSystem, format!("Can't add “{}” into itself", name.to_string_lossy()))
+                .hint("Choose files or folders that are outside this folder."));
+        }
+        let target = unique_path(&dest, &name.to_string_lossy());
+        copy_recursive(src, &target)?;
+        if let Some(rel) = to_rel(root, &target) {
+            added.push(rel);
+        }
+    }
+    Ok(added)
+}
+
+/// `dir/name.ext`, or `dir/name-2.ext`, `dir/name-3.ext` … if taken.
+pub fn unique_path(dir: &Path, name: &str) -> PathBuf {
+    let candidate = dir.join(name);
+    if !candidate.exists() {
+        return candidate;
+    }
+    let (stem, ext) = match name.rfind('.') {
+        Some(i) if i > 0 => (&name[..i], &name[i..]),
+        _ => (name, ""),
+    };
+    (2..).map(|n| dir.join(format!("{stem}-{n}{ext}"))).find(|p| !p.exists()).expect("unbounded")
+}
+
+fn copy_recursive(src: &Path, dst: &Path) -> Result<()> {
+    let meta = fs::metadata(src).map_err(|e| AppError::io("read", src, e))?;
+    if meta.is_dir() {
+        fs::create_dir_all(dst).map_err(|e| AppError::io("create the folder", dst, e))?;
+        for entry in fs::read_dir(src).map_err(|e| AppError::io("read the folder", src, e))?.flatten() {
+            copy_recursive(&entry.path(), &dst.join(entry.file_name()))?;
+        }
+        Ok(())
+    } else {
+        fs::copy(src, dst).map(|_| ()).map_err(|e| AppError::io("copy", src, e))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -310,5 +378,27 @@ mod tests {
         assert_eq!(read_text(&root, "a.tex").unwrap(), "hällo");
         assert!(!root.join("a.tex.kerntex-tmp").exists());
         fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn imports_without_overwriting() {
+        let root = tmp();
+        let outside = tmp();
+        fs::write(outside.join("fig.png"), b"png").unwrap();
+        fs::create_dir_all(outside.join("data")).unwrap();
+        fs::write(outside.join("data/a.csv"), "1,2").unwrap();
+        create_dir(&root, "images").unwrap();
+        fs::write(root.join("images/fig.png"), b"old").unwrap();
+
+        let added = import_files(&root, "images", &[outside.join("fig.png"), outside.join("data")]).unwrap();
+        assert_eq!(added, vec!["images/fig-2.png", "images/data"]);
+        assert_eq!(fs::read(root.join("images/fig.png")).unwrap(), b"old", "never overwrite");
+        assert_eq!(read_bytes(&root, "images/fig-2.png").unwrap(), b"png");
+        assert!(root.join("images/data/a.csv").is_file());
+        assert!(import_files(&root, "../x", &[outside.join("fig.png")]).is_err());
+        assert!(import_files(&root, "images", std::slice::from_ref(&root)).is_err(), "no self-copy");
+        assert_eq!(unique_path(&root, "Makefile"), root.join("Makefile"));
+        fs::remove_dir_all(root).ok();
+        fs::remove_dir_all(outside).ok();
     }
 }

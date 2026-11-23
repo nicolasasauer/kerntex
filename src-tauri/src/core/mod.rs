@@ -3,6 +3,7 @@
 //! (see docs/mcp.md).
 
 pub mod archive;
+pub mod buildinfo;
 pub mod compile;
 pub mod diagnostics;
 pub mod error;

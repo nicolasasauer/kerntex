@@ -1,5 +1,6 @@
 //! Running the TeX engine with live progress, cancellation and parsed results.
 
+use super::buildinfo::{self, BuildDetails};
 use super::diagnostics::{self, Diagnostic, Severity};
 use super::error::{AppError, ErrorSource, Result};
 use super::project::{self, BUILD_DIR};
@@ -59,6 +60,8 @@ pub struct CompileResult {
     /// Raw engine output for the "Raw log" view.
     pub log: String,
     pub engine_label: String,
+    /// Engine, packages and versions — for the "Build details" view.
+    pub details: BuildDetails,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -69,6 +72,12 @@ pub struct EngineStatus {
     /// False until Tectonic has downloaded its package bundle once. The UI
     /// uses this to announce the one-time download on the first compile.
     pub tectonic_cache_ready: bool,
+    /// e.g. "Tectonic 0.17.0"
+    pub tectonic_version: Option<String>,
+    /// e.g. "Latexmk, John Collins, 31 Jan. 2024. Version 4.83"
+    pub latexmk_version: Option<String>,
+    /// Where Tectonic caches downloaded packages.
+    pub tectonic_cache_dir: Option<String>,
 }
 
 /// Shared handle so a running build can be cancelled from another thread.
@@ -95,11 +104,28 @@ impl CancelHandle {
 }
 
 pub fn detect_engines() -> EngineStatus {
+    let tectonic = find_tectonic();
+    let latexmk = find_in_path("latexmk");
+    let cache = tectonic_cache_dir();
     EngineStatus {
-        tectonic: find_tectonic().map(|p| p.display().to_string()),
-        latexmk: find_in_path("latexmk").map(|p| p.display().to_string()),
-        tectonic_cache_ready: tectonic_cache_dir().is_some_and(|d| d.read_dir().map(|mut r| r.next().is_some()).unwrap_or(false)),
+        tectonic_version: tectonic.as_deref().and_then(|p| version_line(p, "--version")),
+        latexmk_version: latexmk.as_deref().and_then(|p| version_line(p, "-v")),
+        tectonic: tectonic.map(|p| p.display().to_string()),
+        latexmk: latexmk.map(|p| p.display().to_string()),
+        tectonic_cache_ready: cache.as_ref().is_some_and(|d| d.read_dir().map(|mut r| r.next().is_some()).unwrap_or(false)),
+        tectonic_cache_dir: cache.map(|d| d.display().to_string()),
     }
+}
+
+/// First meaningful line of `<bin> <flag>`, e.g. "Tectonic 0.17.0".
+fn version_line(bin: &Path, flag: &str) -> Option<String> {
+    let mut c = Command::new(bin);
+    c.arg(flag).stdin(Stdio::null()).stderr(Stdio::null());
+    hide_window(&mut c);
+    let out = c.output().ok()?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    let line = text.lines().map(str::trim).find(|l| !l.is_empty())?;
+    Some(line.trim_start_matches("Latexmk: ").to_string())
 }
 
 /// Where Tectonic keeps downloaded packages (mirrors its own lookup).
@@ -171,6 +197,7 @@ pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: imp
     std::fs::create_dir_all(&out_dir).map_err(|e| AppError::io("create the build folder", &out_dir, e))?;
 
     let (mut cmd, label) = build_command(req, &root, &out_dir)?;
+    let engine_path = cmd.get_program().to_string_lossy().into_owned();
     let start = Instant::now();
     on_progress(Progress { stage: "Starting engine".into(), detail: Some(label.clone()), elapsed_ms: 0 });
 
@@ -255,6 +282,7 @@ pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: imp
                 duration_ms,
                 log,
                 engine_label: label,
+                details: BuildDetails::default(),
             })
         }
     };
@@ -268,13 +296,22 @@ pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: imp
             duration_ms,
             log,
             engine_label: label,
+            details: BuildDetails::default(),
         });
     }
+
+    // Both engines leave the TeX log in the output folder (Tectonic via --keep-logs).
+    let log_file = out_dir.join(format!("{stem}.log"));
+    let tex_log = std::fs::read_to_string(&log_file).unwrap_or_default();
+    let mut details = buildinfo::parse_log(&tex_log);
+    details.passes = pass;
+    details.engine_path = Some(engine_path);
+    details.out_dir = Some(out_dir.display().to_string());
+    details.log_path = existing(&log_file);
 
     let mut diags = match req.engine {
         Engine::Tectonic => diagnostics::parse_tectonic(&log),
         Engine::Latexmk => {
-            let tex_log = std::fs::read_to_string(out_dir.join(format!("{stem}.log"))).unwrap_or_default();
             let mut d = diagnostics::parse_tex_log(&tex_log);
             for (ext, biber) in [("blg", false), ("blg", true)] {
                 if let Ok(b) = std::fs::read_to_string(out_dir.join(format!("{stem}.{ext}"))) {
@@ -317,6 +354,7 @@ pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: imp
         duration_ms,
         log,
         engine_label: label,
+        details,
     })
 }
 
@@ -513,6 +551,10 @@ mod tests {
             assert!(res.ok && res.pdf_path.is_some(), "{}: {errors:?}\n{}", root.display(), &res.log[res.log.len().saturating_sub(3000)..]);
             let undefined: Vec<_> = res.diagnostics.iter().filter(|d| d.message.contains("undefined")).collect();
             assert!(undefined.is_empty(), "{}: unresolved refs {undefined:?}", root.display());
+            assert!(res.details.document_class.is_some(), "{:?}", res.details);
+            let uses_packages = std::fs::read_to_string(root.join("main.tex")).unwrap().contains("\\usepackage");
+            assert_eq!(!res.details.packages.is_empty(), uses_packages, "{:?}", res.details);
+            assert!(res.details.passes >= 1 && res.details.log_path.is_some());
         }
         std::fs::remove_dir_all(base).ok();
     }
@@ -568,6 +610,8 @@ mod tests {
         let errors: Vec<_> = res.diagnostics.iter().filter(|d| d.severity == Severity::Error).collect();
         assert!(res.ok && res.pdf_path.is_some(), "{errors:?}\n{}", res.log);
         assert!(stages.iter().any(|s| s.starts_with("Typesetting")), "{stages:?}");
+        assert!(res.details.packages.iter().any(|p| p.name == "amsmath"), "build details: {:?}", res.details);
+        assert!(res.details.program.as_deref().is_some_and(|p| p.contains("XeTeX")), "{:?}", res.details.program);
         let undefined: Vec<_> = res.diagnostics.iter().filter(|d| d.message.contains("undefined")).collect();
         assert!(undefined.is_empty(), "unresolved refs/citations: {undefined:?}");
 

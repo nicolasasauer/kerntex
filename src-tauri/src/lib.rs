@@ -20,6 +20,8 @@ pub fn run() {
             commands::create_dir,
             commands::rename_path,
             commands::trash_path,
+            commands::import_files,
+            commands::read_binary,
             commands::scan_refs,
             commands::save_project_settings,
             commands::tex_root,

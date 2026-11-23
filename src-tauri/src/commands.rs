@@ -29,6 +29,9 @@ pub async fn detect_engines() -> EngineStatus {
         tectonic: None,
         latexmk: None,
         tectonic_cache_ready: false,
+        tectonic_version: None,
+        latexmk_version: None,
+        tectonic_cache_dir: None,
     })
 }
 
@@ -75,6 +78,22 @@ pub async fn rename_path(root: String, from: String, to: String) -> Result<()> {
 #[tauri::command]
 pub async fn trash_path(root: String, path: String) -> Result<()> {
     blocking(move || project::trash(Path::new(&root), &path)).await
+}
+
+/// Copies files/folders from anywhere into the project (drag & drop, "Add files…").
+#[tauri::command]
+pub async fn import_files(root: String, dir: String, sources: Vec<String>) -> Result<Vec<String>> {
+    blocking(move || {
+        let sources: Vec<PathBuf> = sources.into_iter().map(PathBuf::from).collect();
+        project::import_files(Path::new(&root), &dir, &sources)
+    })
+    .await
+}
+
+/// Raw bytes of a project file (image / PDF previews), without JSON number arrays.
+#[tauri::command]
+pub async fn read_binary(root: String, path: String) -> Result<tauri::ipc::Response> {
+    blocking(move || project::read_bytes(Path::new(&root), &path).map(tauri::ipc::Response::new)).await
 }
 
 #[tauri::command]
