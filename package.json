@@ -11,7 +11,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "tauri": "tauri",
     "setup:tectonic": "node scripts/fetch-tectonic.mjs",
-    "test:scripts": "node --test scripts/fetch-tectonic.test.mjs"
+    "test:scripts": "node --test scripts/fetch-tectonic.test.mjs scripts/build-msix.test.mjs",
+    "build:msix": "node scripts/build-msix.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.0",
