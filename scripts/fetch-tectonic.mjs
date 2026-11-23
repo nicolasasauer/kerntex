@@ -68,6 +68,18 @@ async function listReleases() {
   return all;
 }
 
+/**
+ * On Windows use the system bsdtar explicitly: in Git Bash, `tar` is GNU tar,
+ * which reads `C:\…` as a remote host and can't open .zip files.
+ */
+function tarCommand() {
+  if (process.platform === "win32") {
+    const sys = join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe");
+    if (existsSync(sys)) return sys;
+  }
+  return "tar";
+}
+
 function findFile(dir, name) {
   for (const entry of readdirSync(dir)) {
     const p = join(dir, entry);
@@ -105,7 +117,7 @@ async function main() {
     // bsdtar (Windows 10+) and GNU tar both handle .tar.gz; bsdtar also handles .zip.
     const extract = join(tmp, "x");
     mkdirSync(extract);
-    execFileSync("tar", ["-xf", archive, "-C", extract], { stdio: "inherit" });
+    execFileSync(tarCommand(), ["-xf", archive, "-C", extract], { stdio: "inherit" });
     const bin = findFile(extract, windows ? "tectonic.exe" : "tectonic");
     if (!bin) throw new Error(`The archive ${asset.name} doesn't contain a tectonic binary.`);
 
