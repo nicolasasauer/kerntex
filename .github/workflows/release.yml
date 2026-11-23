@@ -60,6 +60,30 @@ jobs:
           releaseDraft: true
           args: --config src-tauri/tauri.tectonic.conf.json
 
+      - name: MSIX package for the Microsoft Store
+        id: msix
+        if: runner.os == 'Windows'
+        env:
+          # From Partner Center → Product identity (Settings → Secrets and variables → Actions → Variables).
+          MSIX_IDENTITY_NAME: ${{ vars.MSIX_IDENTITY_NAME }}
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
+          MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.MSIX_PUBLISHER_DISPLAY_NAME }}
+        run: node scripts/build-msix.mjs --profile release
+
+      - name: Keep the MSIX as a workflow artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: KernTeX-msix
+          path: ${{ steps.msix.outputs.msix }}
+
+      - name: Attach the MSIX to the release
+        if: runner.os == 'Windows' && github.ref_type == 'tag'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" "${{ steps.msix.outputs.msix }}" --clobber
+
       - name: Installer sizes
         shell: bash
-        run: find src-tauri/target/release/bundle -type f \( -name '*.exe' -o -name '*.msi' -o -name '*.AppImage' -o -name '*.deb' \) -exec ls -lh {} \; | tee -a "$GITHUB_STEP_SUMMARY"
+        run: find src-tauri/target/release/bundle -type f \( -name '*.exe' -o -name '*.msi' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.msix' \) -exec ls -lh {} \; | tee -a "$GITHUB_STEP_SUMMARY"

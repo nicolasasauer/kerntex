@@ -1,6 +1,11 @@
 # KernTeX
 
-A fast, modern, local LaTeX editor — file tree, editor and live PDF side by side, with clear error messages and a built-in TeX engine. No account, no cloud, nothing else to install.
+[![Written in Rust](https://img.shields.io/badge/written%20in-Rust-dea584?logo=rust&logoColor=white)](#built-with)
+[![Tauri 2](https://img.shields.io/badge/Tauri-2-24c8db?logo=tauri&logoColor=white)](https://tauri.app)
+[![CI](https://github.com/nicolasasauer/kerntex/actions/workflows/ci.yml/badge.svg)](https://github.com/nicolasasauer/kerntex/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+A fast, modern, local LaTeX editor — file tree, editor and live PDF side by side, with clear error messages and a built-in TeX engine. No account, no cloud, nothing else to install. **Written in Rust.**
 
 <p align="center">
   <img src="docs/screenshots/light.png" alt="KernTeX in light mode" width="49%">
@@ -51,6 +56,17 @@ No TeX installation needed: KernTeX ships with [Tectonic](https://tectonic-types
   </tr>
 </table>
 
+## Built with
+
+KernTeX's core is **written in Rust**: file access with path protection, running and cancelling the TeX engine, the log parser that turns TeX output into clear, actionable messages, ZIP import/export and build details. It has no dependency on the UI framework, so the same code can back a CLI or the planned MCP server.
+
+| Part | Technology |
+| --- | --- |
+| Core logic | **Rust** (`src-tauri/src/core/`) |
+| App shell | [Tauri 2](https://tauri.app) (Rust) — small installers, native WebView, low memory |
+| TeX engine | [Tectonic](https://tectonic-typesetting.github.io) (Rust + XeTeX), bundled; or your own TeX Live / MiKTeX via latexmk |
+| Interface | [Svelte 5](https://svelte.dev) + TypeScript, [CodeMirror 6](https://codemirror.net), [pdf.js](https://mozilla.github.io/pdf.js/) |
+
 ## Bring your Overleaf projects
 
 KernTeX works on ordinary folders — there's no special project format.
@@ -83,7 +99,7 @@ npm run tauri build -- --config src-tauri/tauri.tectonic.conf.json   # installer
 
 ## Contributing
 
-Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the UX rules in [DESIGN.md](DESIGN.md). A planned MCP interface for AI agents is described in [docs/mcp.md](docs/mcp.md); open points are tracked in [docs/roadmap.md](docs/roadmap.md).
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the UX rules in [DESIGN.md](DESIGN.md). A planned MCP interface for AI agents is described in [docs/mcp.md](docs/mcp.md); open points are tracked in [docs/roadmap.md](docs/roadmap.md) and as [issues](https://github.com/nicolasasauer/kerntex/issues). Releasing to the Microsoft Store is described in [docs/microsoft-store.md](docs/microsoft-store.md).
 
 ## License
 

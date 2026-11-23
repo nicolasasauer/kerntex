@@ -68,3 +68,9 @@ jobs:
       - name: cargo test
         working-directory: src-tauri
         run: cargo test -- --nocapture
+
+      - name: MSIX package builds (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cargo build --manifest-path src-tauri/Cargo.toml
+          node scripts/build-msix.mjs --profile debug
