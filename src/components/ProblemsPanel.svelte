@@ -12,6 +12,7 @@
   import { openUrl } from "../lib/api";
   import { toast } from "../lib/toasts.svelte";
   import { PACKAGE_INFO } from "../lib/latex/packages";
+  import BuildDetails from "./BuildDetails.svelte";
   import type { Diagnostic, Severity } from "../lib/types";
 
   let filter: Severity | "all" = $state("all");
@@ -65,21 +66,24 @@
     </button>
     {#if L.problemsOpen}
       <div class="tabs">
-        {#if !ui.rawLog}
+        {#if ui.bottomTab === "problems"}
           {#each [["all", "All"], ["error", "Errors"], ["warning", "Warnings"], ["info", "Info"]] as [v, label]}
             <button class="chip" class:on={filter === v} onclick={() => (filter = v as Severity | "all")}>{label}</button>
           {/each}
           <span class="sep"></span>
         {/if}
-        <button class="chip" class:on={!ui.rawLog} onclick={() => (ui.rawLog = false)}>Problems</button>
-        <button class="chip" class:on={ui.rawLog} onclick={() => (ui.rawLog = true)}>Raw log</button>
+        <button class="chip" class:on={ui.bottomTab === "problems"} onclick={() => (ui.bottomTab = "problems")}>Problems</button>
+        <button class="chip" class:on={ui.bottomTab === "details"} onclick={() => { ui.bottomTab = "details"; L.problems = Math.max(L.problems, 320); }} title="Engine, versions and the packages your document uses">Build details</button>
+        <button class="chip" class:on={ui.bottomTab === "log"} onclick={() => (ui.bottomTab = "log")}>Raw log</button>
       </div>
     {/if}
   </div>
 
   {#if L.problemsOpen}
     <div class="body" style:height="{L.problems}px">
-      {#if ui.rawLog}
+      {#if ui.bottomTab === "details"}
+        <BuildDetails />
+      {:else if ui.bottomTab === "log"}
         <pre class="log">{ws.log || "No log yet — compile first."}</pre>
       {:else if ws.diagnostics.length === 0}
         <p class="empty muted">
@@ -138,7 +142,7 @@
           </ul>
         {/each}
         {#if ws.diagnostics.some((d) => d.hint?.startsWith("KernTeX couldn't find"))}
-          <button class="btn link" onclick={() => (ui.rawLog = true)}>Open raw log</button>
+          <button class="btn link" onclick={() => (ui.bottomTab = "log")}>Open raw log</button>
         {/if}
       {/if}
     </div>

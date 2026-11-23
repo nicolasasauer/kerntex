@@ -8,18 +8,7 @@
   import { settings } from "../lib/settings.svelte";
   import { api, joinPath, revealInFolder, toAppError } from "../lib/api";
   import type { PDFDocumentProxy } from "pdfjs-dist";
-
-  type Pdfjs = typeof import("pdfjs-dist");
-  let pdfjs: Promise<Pdfjs> | null = null;
-
-  // pdf.js is ~1 MB: load it only when the first PDF is shown.
-  function loadPdfjs() {
-    pdfjs ??= Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs?url")]).then(([lib, worker]) => {
-      lib.GlobalWorkerOptions.workerSrc = worker.default;
-      return lib;
-    });
-    return pdfjs;
-  }
+  import { loadPdfjs } from "../lib/pdfjs";
 
   let scroller: HTMLDivElement | undefined = $state();
   let doc: PDFDocumentProxy | null = null;

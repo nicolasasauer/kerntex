@@ -33,6 +33,16 @@
     } else await ws.openProject(p);
   }
 
+  /** Project folder under a (physical-pixel) drop position, or null if not over the tree. */
+  function treeDirAt(px: number, py: number): string | null {
+    if (!ws.project) return null;
+    const dpr = window.devicePixelRatio || 1;
+    const el = document.elementFromPoint(px / dpr, py / dpr);
+    if (!el?.closest(".filetree")) return null;
+    const row = el.closest<HTMLElement>("[data-dir]");
+    return row?.dataset.dir ?? "";
+  }
+
   onMount(() => {
     ws.init();
     // Dev-only handle for automated UI checks (stripped from production builds).
@@ -41,11 +51,22 @@
     if (isTauri) {
       import("@tauri-apps/api/webview").then(async ({ getCurrentWebview }) => {
         unlisten = await getCurrentWebview().onDragDropEvent((e) => {
-          if (e.payload.type === "over" || e.payload.type === "enter") dragging = true;
-          else if (e.payload.type === "leave") dragging = false;
-          else if (e.payload.type === "drop") {
+          const t = e.payload.type;
+          if (t === "leave") {
             dragging = false;
-            handleDrop(e.payload.paths);
+            ui.dropDir = null;
+            return;
+          }
+          // Over the file tree of an open project → add files to the folder under the pointer.
+          const dir = "position" in e.payload ? treeDirAt(e.payload.position.x, e.payload.position.y) : null;
+          if (t === "enter" || t === "over") {
+            ui.dropDir = dir;
+            dragging = dir === null;
+          } else if (t === "drop") {
+            dragging = false;
+            ui.dropDir = null;
+            if (dir !== null) ws.addFiles(dir, e.payload.paths);
+            else handleDrop(e.payload.paths);
           }
         });
       });

@@ -11,7 +11,10 @@ export const ui = $state({
   settings: false,
   newProject: false,
   about: false,
-  rawLog: false,
+  /** Bottom panel tab. */
+  bottomTab: "problems" as "problems" | "details" | "log",
+  /** Folder under the pointer while files are dragged over the tree ("" = root, null = none). */
+  dropDir: null as string | null,
   /** Set by the file tree to start an inline "new file" input. */
   treeCreate: null as null | { dir: string; kind: "file" | "folder" },
 });
@@ -53,7 +56,9 @@ export const commands: Command[] = [
   { id: "toggleTree", title: "Toggle file tree", group: "View", shortcut: "Mod+B", when: hasProject, run: () => (settings.layout.treeOpen = !settings.layout.treeOpen) },
   { id: "togglePdf", title: "Toggle PDF preview", group: "View", shortcut: "Mod+Shift+P", when: hasProject, run: () => (settings.layout.pdfOpen = !settings.layout.pdfOpen) },
   { id: "toggleProblems", title: "Toggle problems panel", group: "View", shortcut: "Mod+J", when: hasProject, run: () => (settings.layout.problemsOpen = !settings.layout.problemsOpen) },
-  { id: "rawLog", title: "Show raw log", group: "Build", when: hasProject, run: () => { settings.layout.problemsOpen = true; ui.rawLog = true; } },
+  { id: "rawLog", title: "Show raw log", group: "Build", when: hasProject, run: () => { settings.layout.problemsOpen = true; ui.bottomTab = "log"; } },
+  { id: "buildDetails", title: "Show build details (engine, packages, versions)", group: "Build", when: hasProject, run: () => { settings.layout.problemsOpen = true; settings.layout.problems = Math.max(settings.layout.problems, 320); ui.bottomTab = "details"; } },
+  { id: "addFiles", title: "Add files to project…", group: "File", when: hasProject, run: () => ws.addFiles("") },
   { id: "find", title: "Find / replace in file", group: "Edit", shortcut: "Mod+F", when: () => ws.active != null, run: () => { if (ws.editor) openSearchPanel(ws.editor.view); } },
   { id: "settings", title: "Settings", group: "Preferences", shortcut: "Mod+,", run: () => (ui.settings = true) },
   { id: "themeLight", title: "Theme: Light", group: "Preferences", run: () => (settings.theme = "light") },

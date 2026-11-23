@@ -59,6 +59,24 @@ export interface CompileRequest {
   flavor: TexFlavor;
 }
 
+export interface PackageRef {
+  name: string;
+  date: string | null;
+  version: string | null;
+  description: string | null;
+}
+
+export interface BuildDetails {
+  program: string | null;
+  format: string | null;
+  documentClass: PackageRef | null;
+  packages: PackageRef[];
+  passes: number;
+  enginePath: string | null;
+  outDir: string | null;
+  logPath: string | null;
+}
+
 export interface CompileResult {
   ok: boolean;
   canceled: boolean;
@@ -67,6 +85,7 @@ export interface CompileResult {
   durationMs: number;
   log: string;
   engineLabel: string;
+  details: BuildDetails;
 }
 
 export interface Progress {
@@ -79,6 +98,9 @@ export interface EngineStatus {
   tectonic: string | null;
   latexmk: string | null;
   tectonicCacheReady: boolean;
+  tectonicVersion: string | null;
+  latexmkVersion: string | null;
+  tectonicCacheDir: string | null;
 }
 
 export interface LabelRef {

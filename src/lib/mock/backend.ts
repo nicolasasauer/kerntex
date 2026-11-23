@@ -6,7 +6,11 @@ import welcomeTex from "../../../src-tauri/templates/welcome/main.tex?raw";
 import welcomeBib from "../../../src-tauri/templates/welcome/references.bib?raw";
 import articleTex from "../../../src-tauri/templates/article.tex?raw";
 import samplePdfUrl from "./sample.pdf?url";
-import type { CompileRequest, CompileResult, Diagnostic, FileNode, ProjectInfo } from "../types";
+import exampleImageUrl from "../../../src-tauri/templates/welcome/images/example.png?url";
+import sampleDetails from "./details.json";
+import type { BuildDetails, CompileRequest, CompileResult, Diagnostic, FileNode, ProjectInfo } from "../types";
+
+const emptyDetails: BuildDetails = { program: null, format: null, documentClass: null, packages: [], passes: 0, enginePath: null, outDir: null, logPath: null };
 
 const ROOT = "/home/demo/Documents/Welcome to KernTeX";
 const files = new Map<string, string>([
@@ -69,7 +73,7 @@ async function compile(req: CompileRequest): Promise<CompileResult> {
     emit("compile://progress", { stage, detail, elapsedMs: Math.round(performance.now() - start) });
     await delay(ms);
     if (cancelFlag) {
-      return { ok: false, canceled: true, pdfPath: null, diagnostics: [], durationMs: Math.round(performance.now() - start), log: "", engineLabel: "Tectonic" };
+      return { ok: false, canceled: true, pdfPath: null, diagnostics: [], durationMs: Math.round(performance.now() - start), log: "", engineLabel: "Tectonic", details: emptyDetails };
     }
   }
   const diagnostics: Diagnostic[] = [];
@@ -85,7 +89,7 @@ async function compile(req: CompileRequest): Promise<CompileResult> {
   diagnostics.push({ severity: "warning", source: "LaTeX", file: "main.tex", line: 137, message: "Overfull \\hbox (27.6pt too wide) in paragraph at lines 135--139", hint: "A line sticks out into the margin. Rephrase it, allow hyphenation (e.g. long URLs with \\url{…}), or load \\usepackage{microtype}." });
   diagnostics.push({ severity: "info", source: "hyperref", file: "main.tex", line: 31, message: "Token not allowed in a PDF string (Unicode): removing `\\textsf'", hint: null });
   const ok = !diagnostics.some((d) => d.severity === "error");
-  return { ok, canceled: false, pdfPath: `${ROOT}/.kerntex/out/main.pdf`, diagnostics, durationMs: Math.round(performance.now() - start), log: "This is a mock log.\n(./main.tex\nLaTeX Warning: ...\n)", engineLabel: req.engine === "tectonic" ? "Tectonic" : "latexmk (pdfLaTeX)" };
+  return { ok, canceled: false, pdfPath: `${ROOT}/.kerntex/out/main.pdf`, diagnostics, durationMs: Math.round(performance.now() - start), log: "This is a mock log.\n(./main.tex\nLaTeX Warning: ...\n)", engineLabel: req.engine === "tectonic" ? "Tectonic" : "latexmk (pdfLaTeX)", details: sampleDetails as BuildDetails };
 }
 
 export async function invoke<T>(cmd: string, args: Record<string, any> = {}): Promise<T> {
@@ -97,7 +101,7 @@ export async function invoke<T>(cmd: string, args: Record<string, any> = {}): Pr
 async function handle(cmd: string, a: Record<string, any>): Promise<unknown> {
   switch (cmd) {
     case "detect_engines":
-      return { tectonic: "/opt/kerntex/tectonic", latexmk: "/usr/bin/latexmk", tectonicCacheReady: true };
+      return { tectonic: "/opt/kerntex/tectonic", latexmk: "/usr/bin/latexmk", tectonicCacheReady: true, tectonicVersion: "Tectonic 0.17.0", latexmkVersion: "Latexmk, John Collins, 31 Jan. 2024. Version 4.83", tectonicCacheDir: "/home/demo/.cache/Tectonic" };
     case "project_exists":
       return true;
     case "welcome_project":
@@ -139,6 +143,21 @@ async function handle(cmd: string, a: Record<string, any>): Promise<unknown> {
       for (const k of [...files.keys()]) if (k === a.path || k.startsWith(a.path + "/")) files.delete(k);
       dirs.delete(a.path);
       return null;
+    case "import_files": {
+      const added: string[] = [];
+      for (const src of a.sources as string[]) {
+        const name = src.split(/[\\/]/).pop()!;
+        let rel = a.dir ? `${a.dir}/${name}` : name;
+        const dot = name.lastIndexOf(".");
+        for (let n = 2; files.has(rel); n++) rel = (a.dir ? `${a.dir}/` : "") + (dot > 0 ? `${name.slice(0, dot)}-${n}${name.slice(dot)}` : `${name}-${n}`);
+        files.set(rel, "<binary>");
+        added.push(rel);
+      }
+      return added;
+    }
+    case "read_binary":
+      if (!files.has(a.path)) throw err(`Couldn't open “${a.path}”`);
+      return (await fetch(a.path.endsWith(".pdf") ? samplePdfUrl : exampleImageUrl)).arrayBuffer();
     case "scan_refs": {
       const labels: { name: string; file: string; line: number }[] = [];
       const citations: { key: string; kind: string; title: string | null; file: string }[] = [];

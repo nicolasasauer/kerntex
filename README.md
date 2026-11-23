@@ -26,6 +26,8 @@ No TeX installation needed: KernTeX ships with [Tectonic](https://tectonic-types
 - **Smart completion** — commands, environments, `\ref{` with all labels of the project and `\cite{` with all keys from your `.bib` files.
 - **Command palette** (`Ctrl+K`) with every action and its shortcut.
 - **Light and dark mode**, following your system by default. Respects “reduce motion”.
+- **Images in two clicks** — drag files onto the file tree (or *Add files…*), preview images and PDF figures, insert a ready-made `figure` with one click.
+- **Look under the hood** — *Build details* shows the engine and its version, the document class and every package with its version, plus links to the output folder and the full log. No log flood: it's there when you open it.
 - **Safe with your files** — atomic saves, autosave, deleting goes to the system trash, nothing is overwritten without asking. Build output lives in `.kerntex/out/`, keeping your folder clean.
 
 ## Bring your Overleaf projects
@@ -60,7 +62,7 @@ npm run tauri build -- --config src-tauri/tauri.tectonic.conf.json   # installer
 
 ## Contributing
 
-Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the UX rules in [DESIGN.md](DESIGN.md). A planned MCP interface for AI agents is described in [docs/mcp.md](docs/mcp.md).
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the UX rules in [DESIGN.md](DESIGN.md). A planned MCP interface for AI agents is described in [docs/mcp.md](docs/mcp.md); open points are tracked in [docs/roadmap.md](docs/roadmap.md).
 
 ## License
 

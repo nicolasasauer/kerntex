@@ -59,6 +59,8 @@ export const api = {
   createDir: (root: string, path: string) => call<void>("create_dir", { root, path }),
   renamePath: (root: string, from: string, to: string) => call<void>("rename_path", { root, from, to }),
   trashPath: (root: string, path: string) => call<void>("trash_path", { root, path }),
+  importFiles: (root: string, dir: string, sources: string[]) => call<string[]>("import_files", { root, dir, sources }),
+  readBinary: (root: string, path: string) => call<ArrayBuffer>("read_binary", { root, path }),
   scanRefs: (root: string) => call<ProjectRefs>("scan_refs", { root }),
   saveProjectSettings: (root: string, settings: ProjectSettings) => call<void>("save_project_settings", { root, settings }),
   texRoot: (root: string, path: string) => call<string | null>("tex_root", { root, path }),
@@ -87,6 +89,16 @@ export async function pickZip(): Promise<string | null> {
   const { open } = await import("@tauri-apps/plugin-dialog");
   const r = await open({ title: "Import ZIP", filters: [{ name: "ZIP archive", extensions: ["zip"] }] });
   return typeof r === "string" ? r : null;
+}
+
+export async function pickFiles(title: string): Promise<string[]> {
+  if (!isTauri) {
+    const r = window.prompt(title, "/home/demo/Pictures/photo.png");
+    return r ? [r] : [];
+  }
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const r = await open({ title, multiple: true });
+  return Array.isArray(r) ? r : r ? [r] : [];
 }
 
 export async function pickSavePath(title: string, defaultPath: string, ext: string, label: string): Promise<string | null> {

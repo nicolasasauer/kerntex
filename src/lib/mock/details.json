@@ -1,0 +1,352 @@
+{
+ "program": "This is XeTeX, Version 3.141592653-2.6-0.999996 (Tectonic)",
+ "format": "LaTeX2e <2023-11-01> patch level 1",
+ "documentClass": {
+  "name": "article",
+  "date": "2023/05/17",
+  "version": "v1.4n",
+  "description": "Standard LaTeX document class"
+ },
+ "packages": [
+  {
+   "name": "iftex",
+   "date": "2022/02/03",
+   "version": "v1.0f",
+   "description": "TeX engine tests"
+  },
+  {
+   "name": "fontenc",
+   "date": "2021/04/29",
+   "version": "v2.0v",
+   "description": "Standard LaTeX package"
+  },
+  {
+   "name": "lmodern",
+   "date": "2015/05/01",
+   "version": "v1.6.1",
+   "description": "Latin Modern Fonts"
+  },
+  {
+   "name": "geometry",
+   "date": "2020/01/02",
+   "version": "v5.9",
+   "description": "Page Geometry"
+  },
+  {
+   "name": "keyval",
+   "date": "2022/05/29",
+   "version": "v1.15",
+   "description": "key=value parser (DPC)"
+  },
+  {
+   "name": "ifvtex",
+   "date": "2019/10/25",
+   "version": "v1.7",
+   "description": "ifvtex legacy package. Use iftex instead."
+  },
+  {
+   "name": "microtype",
+   "date": "2023/03/13",
+   "version": "v3.1a",
+   "description": "Micro-typographical refinements (RS)"
+  },
+  {
+   "name": "etoolbox",
+   "date": "2020/10/05",
+   "version": "v2.5k",
+   "description": "e-TeX tools for LaTeX (JAW)"
+  },
+  {
+   "name": "amsmath",
+   "date": "2023/05/13",
+   "version": "v2.17o",
+   "description": "AMS math features"
+  },
+  {
+   "name": "amstext",
+   "date": "2021/08/26",
+   "version": "v2.01",
+   "description": "AMS text"
+  },
+  {
+   "name": "amsbsy",
+   "date": "1999/11/29",
+   "version": "v1.2d",
+   "description": "Bold Symbols"
+  },
+  {
+   "name": "amsopn",
+   "date": "2022/04/08",
+   "version": "v2.04",
+   "description": "operator names"
+  },
+  {
+   "name": "amssymb",
+   "date": "2013/01/14",
+   "version": "v3.01",
+   "description": "AMS font symbols"
+  },
+  {
+   "name": "amsfonts",
+   "date": "2013/01/14",
+   "version": "v3.01",
+   "description": "Basic AMSFonts support"
+  },
+  {
+   "name": "graphicx",
+   "date": "2021/09/16",
+   "version": "v1.2d",
+   "description": "Enhanced LaTeX Graphics (DPC,SPQR)"
+  },
+  {
+   "name": "graphics",
+   "date": "2022/03/10",
+   "version": "v1.4e",
+   "description": "Standard LaTeX Graphics (DPC,SPQR)"
+  },
+  {
+   "name": "trig",
+   "date": "2021/08/11",
+   "version": "v1.11",
+   "description": "sin cos tan (DPC)"
+  },
+  {
+   "name": "booktabs",
+   "date": "2020/01/12",
+   "version": "v1.61803398",
+   "description": "Publication quality tables"
+  },
+  {
+   "name": "xcolor",
+   "date": "2023/11/15",
+   "version": "v3.01",
+   "description": "LaTeX color extensions (UK)"
+  },
+  {
+   "name": "pgfrcs",
+   "date": "2023-01-15",
+   "version": "v3.1.10",
+   "description": "(3.1.10)"
+  },
+  {
+   "name": "pgf",
+   "date": "2023-01-15",
+   "version": "v3.1.10",
+   "description": "(3.1.10)"
+  },
+  {
+   "name": "pgfsys",
+   "date": "2023-01-15",
+   "version": "v3.1.10",
+   "description": "(3.1.10)"
+  },
+  {
+   "name": "pgfcore",
+   "date": "2023-01-15",
+   "version": "v3.1.10",
+   "description": "(3.1.10)"
+  },
+  {
+   "name": "pgfcomp-version-0-65",
+   "date": "2023-01-15",
+   "version": "v3.1.10",
+   "description": "(3.1.10)"
+  },
+  {
+   "name": "pgfcomp-version-1-18",
+   "date": "2023-01-15",
+   "version": "v3.1.10",
+   "description": "(3.1.10)"
+  },
+  {
+   "name": "pgffor",
+   "date": "2023-01-15",
+   "version": "v3.1.10",
+   "description": "(3.1.10)"
+  },
+  {
+   "name": "tikz",
+   "date": "2023-01-15",
+   "version": "v3.1.10",
+   "description": "(3.1.10)"
+  },
+  {
+   "name": "listings",
+   "date": "2023/02/27",
+   "version": null,
+   "description": "1.9 (Carsten Heinz)"
+  },
+  {
+   "name": "biblatex",
+   "date": "2023/03/05",
+   "version": "v3.19",
+   "description": "programmable bibliographies (PK/MW)"
+  },
+  {
+   "name": "pdftexcmds",
+   "date": "2020-06-27",
+   "version": "v0.33",
+   "description": "Utility functions of pdfTeX for LuaTeX (HO)"
+  },
+  {
+   "name": "infwarerr",
+   "date": "2019/12/03",
+   "version": "v1.5",
+   "description": "Providing info/warning/error messages (HO)"
+  },
+  {
+   "name": "ltxcmds",
+   "date": "2023-12-04",
+   "version": "v1.26",
+   "description": "LaTeX kernel commands for general use (HO)"
+  },
+  {
+   "name": "kvoptions",
+   "date": "2022-06-15",
+   "version": "v3.15",
+   "description": "Key value format for package options (HO)"
+  },
+  {
+   "name": "kvsetkeys",
+   "date": "2022-10-05",
+   "version": "v1.19",
+   "description": "Key value parser (HO)"
+  },
+  {
+   "name": "logreq",
+   "date": "2010/08/04",
+   "version": "v1.0",
+   "description": "xml request logger"
+  },
+  {
+   "name": "ifthen",
+   "date": "2022/04/13",
+   "version": "v1.1d",
+   "description": "Standard LaTeX ifthen package (DPC)"
+  },
+  {
+   "name": "url",
+   "date": "2013/09/16",
+   "version": null,
+   "description": "ver 3.4 Verb mode for urls, etc."
+  },
+  {
+   "name": "expl3",
+   "date": "2024-01-22",
+   "version": null,
+   "description": "L3 programming layer (loader)"
+  },
+  {
+   "name": "xparse",
+   "date": "2023-10-10",
+   "version": null,
+   "description": "L3 Experimental document command parser"
+  },
+  {
+   "name": "blx-case-expl3",
+   "date": "2023/03/05",
+   "version": "v3.19",
+   "description": "expl3 case changing code for biblatex"
+  },
+  {
+   "name": "hyperref",
+   "date": "2024-01-20",
+   "version": "v7.01h",
+   "description": "Hypertext links for LaTeX"
+  },
+  {
+   "name": "kvdefinekeys",
+   "date": "2019-12-19",
+   "version": "v1.6",
+   "description": "Define keys (HO)"
+  },
+  {
+   "name": "pdfescape",
+   "date": "2019/12/09",
+   "version": "v1.15",
+   "description": "Implements pdfTeX's escape features (HO)"
+  },
+  {
+   "name": "hycolor",
+   "date": "2020-01-27",
+   "version": "v1.10",
+   "description": "Color options for hyperref/bookmark (HO)"
+  },
+  {
+   "name": "auxhook",
+   "date": "2019-12-17",
+   "version": "v1.6",
+   "description": "Hooks for auxiliary files (HO)"
+  },
+  {
+   "name": "nameref",
+   "date": "2023-11-26",
+   "version": "v2.56",
+   "description": "Cross-referencing by name of section"
+  },
+  {
+   "name": "refcount",
+   "date": "2019/12/15",
+   "version": "v3.6",
+   "description": "Data extraction from label references (HO)"
+  },
+  {
+   "name": "gettitlestring",
+   "date": "2019/12/15",
+   "version": "v1.6",
+   "description": "Cleanup title references (HO)"
+  },
+  {
+   "name": "intcalc",
+   "date": "2019/12/15",
+   "version": "v1.3",
+   "description": "Expandable calculations with integers (HO)"
+  },
+  {
+   "name": "bitset",
+   "date": "2019/12/09",
+   "version": "v1.3",
+   "description": "Handle bit-vector datatype (HO)"
+  },
+  {
+   "name": "bigintcalc",
+   "date": "2019/12/15",
+   "version": "v1.5",
+   "description": "Expandable calculations on big integers (HO)"
+  },
+  {
+   "name": "atbegshi-ltx",
+   "date": "2021/01/10",
+   "version": "v1.0c",
+   "description": "Emulation of the original atbegshi"
+  },
+  {
+   "name": "atveryend-ltx",
+   "date": "2020/08/19",
+   "version": "v1.0a",
+   "description": "Emulation of the original atveryend package"
+  },
+  {
+   "name": "rerunfilecheck",
+   "date": "2022-07-10",
+   "version": "v1.10",
+   "description": "Rerun checks for auxiliary files (HO)"
+  },
+  {
+   "name": "uniquecounter",
+   "date": "2019/12/15",
+   "version": "v1.4",
+   "description": "Provide unlimited unique counter (HO)"
+  },
+  {
+   "name": "epstopdf-base",
+   "date": "2020-01-24",
+   "version": "v2.11",
+   "description": "Base part for package epstopdf"
+  }
+ ],
+ "passes": 2,
+ "enginePath": "/opt/kerntex/tectonic",
+ "outDir": "/home/demo/Documents/Welcome to KernTeX/.kerntex/out",
+ "logPath": "/home/demo/Documents/Welcome to KernTeX/.kerntex/out/main.log"
+}

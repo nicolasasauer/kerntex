@@ -6,8 +6,11 @@
   import { ws } from "../lib/workspace.svelte";
   import { settings } from "../lib/settings.svelte";
   import { fmt } from "../lib/commands.svelte";
+  import FilePreview from "./FilePreview.svelte";
+  import Image from "@lucide/svelte/icons/image";
 
   let host: HTMLDivElement | undefined = $state();
+  const activeTab = $derived(ws.tabs.find((t) => t.path === ws.active));
 
   onMount(() => {
     const editor = createEditor(
@@ -23,8 +26,8 @@
     );
     ws.editor = editor;
     // Tabs may have been opened before the editor mounted.
-    for (const t of ws.tabs) editor.open(t.path, t.saved);
-    if (ws.active) editor.open(ws.active, "");
+    for (const t of ws.tabs) if (t.kind === "text") editor.open(t.path, t.saved);
+    if (ws.active && activeTab?.kind === "text") editor.open(ws.active, "");
     return () => {
       ws.editor = null;
       editor.destroy();
@@ -50,6 +53,7 @@
           onclick={() => ws.activate(tab.path)}
           onauxclick={(e) => e.button === 1 && ws.closeTab(tab.path)}
         >
+          {#if tab.kind === "preview"}<Image size={13} />{/if}
           {name(tab.path)}
           {#if ws.mainFile === tab.path}<span class="main-tag">main</span>{/if}
         </button>
@@ -60,8 +64,10 @@
       </div>
     {/each}
   </div>
-  <div class="host" class:hidden={!ws.active} bind:this={host}></div>
-  {#if !ws.active}
+  <div class="host" class:hidden={!ws.active || activeTab?.kind !== "text"} bind:this={host}></div>
+  {#if activeTab?.kind === "preview"}
+    {#key activeTab.path}<FilePreview path={activeTab.path} />{/key}
+  {:else if !ws.active}
     <div class="empty">
       <FileText size={34} strokeWidth={1.4} />
       <p>Open a file from the tree on the left.</p>

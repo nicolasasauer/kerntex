@@ -61,6 +61,8 @@
     class="row"
     class:active={ws.active === node.path}
     class:generated={node.generated}
+    class:drop-target={node.isDir && ui.dropDir === node.path}
+    data-dir={node.isDir ? node.path : node.path.includes("/") ? node.path.slice(0, node.path.lastIndexOf("/")) : ""}
     style:padding-left="{8 + depth * 14}px"
     onclick={click}
     oncontextmenu={(e) => onMenu(e, node)}
@@ -121,6 +123,11 @@
   }
   .row.active {
     background: var(--accent-soft);
+  }
+  .row.drop-target {
+    background: var(--accent-soft);
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
   }
   .row.generated {
     opacity: 0.5;

@@ -10,11 +10,13 @@
   import FolderSearch from "@lucide/svelte/icons/folder-search";
   import FileText from "@lucide/svelte/icons/file-text";
   import Folder from "@lucide/svelte/icons/folder";
+  import FileUp from "@lucide/svelte/icons/file-up";
+  import Eye2 from "@lucide/svelte/icons/scan-eye";
   import { SvelteSet } from "svelte/reactivity";
   import TreeNode from "./TreeNode.svelte";
   import InlineInput from "./InlineInput.svelte";
   import ContextMenu, { type MenuEntry } from "./ContextMenu.svelte";
-  import { ws } from "../lib/workspace.svelte";
+  import { ws, isPreviewable } from "../lib/workspace.svelte";
   import { settings } from "../lib/settings.svelte";
   import { ui } from "../lib/commands.svelte";
   import { joinPath, revealInFolder } from "../lib/api";
@@ -44,9 +46,17 @@
     const items: MenuEntry[] = [
       { label: "New file", icon: FilePlus, run: () => (ui.treeCreate = { dir, kind: "file" }) },
       { label: "New folder", icon: FolderPlus, run: () => (ui.treeCreate = { dir, kind: "folder" }) },
+      { label: dir ? `Add files to “${dir.split("/").pop()}”…` : "Add files…", icon: FileUp, run: () => ws.addFiles(dir) },
     ];
     if (node) {
       items.push("separator");
+      if (!node.isDir && isPreviewable(node.path)) {
+        items.push({ label: "Preview", icon: Eye2, run: () => ws.openFile(node.path) });
+        if (ws.lastTextTab?.endsWith(".tex")) {
+          const target = ws.lastTextTab;
+          items.push({ label: `Insert figure into ${target.split("/").pop()}`, icon: FileUp, run: () => ws.insertFigure(node.path, target) });
+        }
+      }
       if (!node.isDir && /\.tex$/i.test(node.name)) {
         items.push({ label: "Set as main file", icon: Star, disabled: ws.mainFile === node.path, run: () => ws.setMainFile(node.path) });
       }
@@ -75,12 +85,13 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="filetree" oncontextmenu={(e) => openMenu(e, null)} onkeydown={key}>
+<div class="filetree" class:drop-root={ui.dropDir === ""} oncontextmenu={(e) => openMenu(e, null)} onkeydown={key}>
   <div class="head">
     <span class="label">Files</span>
     <div class="tools">
       <button class="icon-btn" title="New file" aria-label="New file" onclick={() => (ui.treeCreate = { dir: "", kind: "file" })}><FilePlus size={15} /></button>
       <button class="icon-btn" title="New folder" aria-label="New folder" onclick={() => (ui.treeCreate = { dir: "", kind: "folder" })}><FolderPlus size={15} /></button>
+      <button class="icon-btn" title="Add files (images, .bib, …) — or drag them here" aria-label="Add files" onclick={() => ws.addFiles("")}><FileUp size={15} /></button>
       <button
         class="icon-btn"
         class:on={settings.showGenerated}
@@ -93,7 +104,7 @@
       <button class="icon-btn" class:spin={spinning} title="Refresh file tree" aria-label="Refresh file tree" onclick={refresh}><RefreshCw size={15} /></button>
     </div>
   </div>
-  <div class="list" role="tree">
+  <div class="list" role="tree" data-dir="">
     {#if ui.treeCreate && ui.treeCreate.dir === ""}
       {@const kind = ui.treeCreate.kind}
       <div class="row-new">
@@ -110,6 +121,7 @@
     {#each nodes as node (node.path)}
       <TreeNode {node} depth={0} {expanded} {renaming} onMenu={openMenu} onToggle={toggle} onRenameDone={() => (renaming = null)} />
     {/each}
+    <p class="drop-hint">Drag images or other files here to add them</p>
   </div>
 </div>
 
@@ -144,6 +156,21 @@
   .tools .icon-btn {
     width: 26px;
     height: 26px;
+  }
+  .filetree.drop-root .list {
+    background: var(--accent-soft);
+    outline: 2px dashed var(--accent);
+    outline-offset: -4px;
+    border-radius: 8px;
+  }
+  .drop-hint {
+    margin: 10px 8px;
+    padding: 10px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 12px;
+    text-align: center;
   }
   .spin :global(svg) {
     animation: spin 0.6s linear;

@@ -1,7 +1,7 @@
 // CodeMirror 6 setup for LaTeX. One EditorView; each open file keeps its own
 // EditorState (so undo history survives tab switches).
 
-import { EditorState, Compartment, type Extension } from "@codemirror/state";
+import { EditorState, Compartment, StateEffect, type Extension } from "@codemirror/state";
 import {
   EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection,
   dropCursor, rectangularSelection, highlightSpecialChars, hoverTooltip,
@@ -123,6 +123,10 @@ function latexCompletions(host: EditorHost) {
   };
 }
 
+/** Signals that compile diagnostics changed, so the linter must run again
+ *  even though the document text didn't change. */
+const diagnosticsChanged = StateEffect.define<null>();
+
 /** Compile diagnostics + missing-package checks with a one-click fix. */
 function latexLinter(host: EditorHost, getPath: () => string) {
   return linter((view) => {
@@ -164,7 +168,7 @@ function latexLinter(host: EditorHost, getPath: () => string) {
       }
     }
     return out;
-  }, { delay: 400 });
+  }, { delay: 400, needsRefresh: (u) => u.transactions.some((t) => t.effects.some((e) => e.is(diagnosticsChanged))) });
 }
 
 /** Hover over \usepackage{name} → short description. */
@@ -206,6 +210,8 @@ export interface EditorController {
   refreshLint(): void;
   setOptions(o: { fontSize: number; wrap: boolean }): void;
   insertAt(path: string, pos: number, insert: string): void;
+  /** Inserts at the cursor of the current file (on a fresh line) and selects nothing. */
+  insertAtCursor(text: string): void;
   focus(): void;
   destroy(): void;
 }
@@ -278,13 +284,33 @@ export function createEditor(parent: HTMLElement, host: EditorHost, opts: { font
         if (st) states.set(path, st.update({ changes: { from: pos, insert } }).state);
       }
     },
+    insertAtCursor(text) {
+      const { doc } = view.state;
+      let line = doc.lineAt(view.state.selection.main.head);
+      let at: number, insert: string;
+      if (line.text.trim() === "") {
+        // On an empty line: insert right here.
+        at = line.from;
+        insert = text;
+      } else {
+        // Inside a paragraph: never split it — insert after its last line.
+        while (line.number < doc.lines && doc.line(line.number + 1).text.trim() !== "") line = doc.line(line.number + 1);
+        at = line.to;
+        insert = "\n\n" + text.replace(/\n$/, "");
+      }
+      view.dispatch({ changes: { from: at, insert }, selection: { anchor: at + insert.length }, scrollIntoView: true });
+      view.focus();
+    },
     gotoLine(line) {
       const doc = view.state.doc;
       const l = doc.line(Math.max(1, Math.min(line, doc.lines)));
       view.dispatch({ selection: { anchor: l.from }, effects: EditorView.scrollIntoView(l.from, { y: "center" }) });
       view.focus();
     },
-    refreshLint: () => forceLinting(view),
+    refreshLint() {
+      view.dispatch({ effects: diagnosticsChanged.of(null) });
+      forceLinting(view);
+    },
     setOptions(o) {
       lastOptions = { ...lastOptions, ...o };
       view.dispatch({ effects: [wrapC.reconfigure(o.wrap ? EditorView.lineWrapping : []), fontC.reconfigure(fontTheme(o.fontSize))] });

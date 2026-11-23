@@ -1,7 +1,7 @@
 // The open project: files, tabs, compile state, diagnostics. UI components
 // read this state and call its methods; all backend access goes through `api`.
 
-import { api, joinPath, parentDir, pickFolder, pickSavePath, pickZip, confirmDialog, toAppError } from "./api";
+import { api, joinPath, parentDir, pickFiles, pickFolder, pickSavePath, pickZip, confirmDialog, toAppError } from "./api";
 import { settings, addRecent, removeRecent } from "./settings.svelte";
 import { toast, toastError } from "./toasts.svelte";
 import { usepackageInsertPos } from "./latex/packages";
@@ -12,6 +12,8 @@ import type {
 
 export interface Tab {
   path: string;
+  /** "preview" = image or PDF figure, shown read-only. */
+  kind: "text" | "preview";
   /** Text as last saved to disk. */
   saved: string;
   dirty: boolean;
@@ -23,6 +25,16 @@ export type CompileStatus =
   | { state: "done"; result: CompileResult };
 
 const TEXT_EXT = /\.(tex|bib|sty|cls|txt|md|bbx|cbx|dtx|ins|ltx|cfg|def|bst|latexmkrc|tikz|csv|dat|json|yaml|yml|lua|py|r|m|gitignore)$/i;
+
+const PREVIEW_EXT = /\.(png|jpe?g|gif|svg|webp|bmp|pdf)$/i;
+
+export function isPreviewable(path: string) {
+  return PREVIEW_EXT.test(path);
+}
+
+export function isImage(path: string) {
+  return /\.(png|jpe?g|gif|svg|webp|bmp|pdf|eps)$/i.test(path);
+}
 
 export function isTextFile(path: string) {
   const name = path.split("/").pop() ?? path;
@@ -42,6 +54,8 @@ class Workspace {
   engines: EngineStatus | null = $state(null);
   busy: string | null = $state(null);
   editor: EditorController | null = null;
+  /** Most recent text tab: where "Insert figure" goes. */
+  lastTextTab: string | null = null;
 
   #pendingCompile = false;
   #autosaveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -231,14 +245,19 @@ class Workspace {
   async openFile(path: string, line?: number) {
     const p = this.project;
     if (!p) return;
+    if (isPreviewable(path)) {
+      if (!this.tabs.some((t) => t.path === path)) this.tabs.push({ path, kind: "preview", saved: "", dirty: false });
+      this.active = path;
+      return;
+    }
     if (!isTextFile(path)) {
-      toast({ kind: "info", source: "KernTeX", title: `“${path.split("/").pop()}” can't be edited here`, body: "Binary files like images and PDFs can be used from LaTeX, but not edited in KernTeX." });
+      toast({ kind: "info", source: "KernTeX", title: `“${path.split("/").pop()}” can't be opened here`, body: "KernTeX edits text files and previews images and PDFs. Use “Show in file manager” to open it with another program." });
       return;
     }
     if (!this.tabs.some((t) => t.path === path)) {
       try {
         const text = await api.readFile(p.root, path);
-        this.tabs.push({ path, saved: text, dirty: false });
+        this.tabs.push({ path, kind: "text", saved: text, dirty: false });
         this.editor?.open(path, text);
       } catch (e) {
         toastError(toAppError(e));
@@ -247,20 +266,24 @@ class Workspace {
     } else if (this.active !== path) {
       this.editor?.open(path, "");
     }
+    this.lastTextTab = path;
     this.active = path;
     if (line) queueMicrotask(() => this.editor?.gotoLine(line));
   }
 
   activate(path: string) {
     if (this.active === path) return;
-    this.editor?.open(path, "");
+    if (this.tabs.find((t) => t.path === path)?.kind === "text") {
+      this.editor?.open(path, "");
+      this.lastTextTab = path;
+    }
     this.active = path;
   }
 
   async closeTab(path: string) {
     const tab = this.tabs.find((t) => t.path === path);
     if (!tab) return;
-    if (tab.dirty) {
+    if (tab.kind === "text" && tab.dirty) {
       await this.saveFile(path);
     }
     const i = this.tabs.indexOf(tab);
@@ -293,7 +316,7 @@ class Workspace {
   async saveFile(path: string): Promise<boolean> {
     const p = this.project;
     const tab = this.tabs.find((t) => t.path === path);
-    if (!p || !tab) return true;
+    if (!p || !tab || tab.kind !== "text") return true;
     const text = this.editor?.text(path);
     if (text == null || text === tab.saved) {
       tab.dirty = false;
@@ -400,6 +423,66 @@ class Workspace {
     }
   }
 
+  /** Copies files from outside into `dir` ("" = project root). */
+  async addFiles(dir: string, sources?: string[]) {
+    const p = this.project;
+    if (!p) return;
+    const files = sources ?? (await pickFiles(dir ? `Add files to “${dir}”` : "Add files to the project"));
+    if (files.length === 0) return;
+    try {
+      const added = await api.importFiles(p.root, dir, files);
+      await this.refreshTree();
+      const first = added[0];
+      const target = this.lastTextTab && this.tabs.some((t) => t.path === this.lastTextTab) ? this.lastTextTab : null;
+      const renamed = added.filter((a, i) => a.split("/").pop() !== files[i].split(/[\\/]/).pop());
+      toast(
+        {
+          kind: "success",
+          source: "File system",
+          title: added.length === 1 ? `Added “${first}”` : `Added ${added.length} items to ${dir || "the project"}`,
+          body: renamed.length ? `A file with the same name already existed, so the copy was renamed: ${renamed.join(", ")}` : null,
+          action:
+            added.length === 1 && isImage(first) && target?.endsWith(".tex")
+              ? { label: `Insert figure into ${target.split("/").pop()}`, run: () => this.insertFigure(first, target) }
+              : added.length === 1 && isPreviewable(first)
+                ? { label: "Preview", run: () => this.openFile(first) }
+                : undefined,
+        },
+        8000,
+      );
+    } catch (e) {
+      toastError(toAppError(e));
+    }
+  }
+
+  /** `\includegraphics` path for `file`, relative to the main file's folder (Overleaf convention). */
+  graphicsPath(file: string): string {
+    const main = this.mainFile ?? "";
+    const base = main.includes("/") ? main.slice(0, main.lastIndexOf("/") + 1) : "";
+    return base && file.startsWith(base) ? file.slice(base.length) : file;
+  }
+
+  figureSnippet(file: string): string {
+    const label = (file.split("/").pop() ?? "").replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9-]+/g, "-");
+    return [
+      "\\begin{figure}[htbp]",
+      "  \\centering",
+      `  \\includegraphics[width=0.8\\linewidth]{${this.graphicsPath(file)}}`,
+      "  \\caption{}",
+      `  \\label{fig:${label}}`,
+      "\\end{figure}",
+      "",
+    ].join("\n");
+  }
+
+  async insertFigure(file: string, into?: string | null) {
+    const target = into ?? this.lastTextTab;
+    if (!target) return;
+    this.activate(target);
+    await Promise.resolve();
+    this.editor?.insertAtCursor(this.figureSnippet(file));
+  }
+
   /** Quick fix: add \usepackage{pkg} to the main file's preamble. */
   async addPackage(pkg: string) {
     const main = this.mainFile;
@@ -407,7 +490,7 @@ class Workspace {
     if (!main || !p) return;
     if (!this.tabs.some((t) => t.path === main)) {
       const text = await api.readFile(p.root, main);
-      this.tabs.push({ path: main, saved: text, dirty: false });
+      this.tabs.push({ path: main, kind: "text", saved: text, dirty: false });
       const cur = this.active;
       this.editor?.open(main, text);
       if (cur) this.editor?.open(cur, "");
