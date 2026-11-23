@@ -26,7 +26,7 @@ Without these variables the workflow still builds an MSIX (with a placeholder id
 1. Bump `version` in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; merge to `main`.
 2. Publish a GitHub release with a new tag `vX.Y.Z` (or push the tag). The workflow builds everything and attaches the `.msix`.
 3. In Partner Center → *New submission* → *Packages*: upload the `.msix`. The Store requires each version to be higher than the last; the fourth number is always `0`.
-4. Store listing (first time): description, screenshots (`docs/screenshots/` has some), category *Productivity*, privacy policy URL. KernTeX collects no data; Tectonic downloads TeX packages from its package server on first use, which is worth one sentence in the policy.
+4. Store listing (first time): all texts (English and German), answers for the age rating, properties and the certification notes are in [store-listing.md](store-listing.md); screenshots (1920×1080) in `docs/store/`; privacy policy in [PRIVACY.md](../PRIVACY.md).
 5. Age rating questionnaire, pricing (free), submit.
 
 ## Things to know
