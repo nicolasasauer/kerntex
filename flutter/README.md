@@ -53,7 +53,7 @@ Flutter teams.
 
 ## The editor
 
-`lib/src/editor/` — about 2 000 lines of Dart, no editor package.
+`lib/src/editor/` — about 2 800 lines of Dart (plus generated vocabulary), no editor package.
 
 | File | What it does |
 |---|---|
