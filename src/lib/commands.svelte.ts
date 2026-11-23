@@ -4,6 +4,7 @@
 import { ws } from "./workspace.svelte";
 import { settings } from "./settings.svelte";
 import { openUrl } from "./api";
+import { LINKS, reportProblemUrl } from "./about";
 import { openSearchPanel } from "@codemirror/search";
 
 export const ui = $state({
@@ -69,7 +70,9 @@ export const commands: Command[] = [
   { id: "zoomIn", title: "Editor: larger font", group: "View", shortcut: "Mod+=", run: () => (settings.fontSize = Math.min(28, settings.fontSize + 1)) },
   { id: "zoomOut", title: "Editor: smaller font", group: "View", shortcut: "Mod+-", run: () => (settings.fontSize = Math.max(9, settings.fontSize - 1)) },
   { id: "docs", title: "LaTeX help on CTAN", group: "Help", run: () => openUrl("https://www.ctan.org/") },
-  { id: "github", title: "KernTeX on GitHub", group: "Help", run: () => openUrl("https://github.com/nicolasasauer/kerntex") },
+  { id: "github", title: "KernTeX on GitHub", group: "Help", run: () => openUrl(LINKS.repo) },
+  { id: "about", title: "About KernTeX", group: "Help", run: () => (ui.about = true) },
+  { id: "report", title: "Report a problem…", group: "Help", run: () => openUrl(reportProblemUrl()) },
 ];
 
 export function commandById(id: string) {

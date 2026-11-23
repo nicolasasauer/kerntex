@@ -14,6 +14,7 @@
   import CommandPalette from "./CommandPalette.svelte";
   import SettingsDialog from "./SettingsDialog.svelte";
   import NewProjectDialog from "./NewProjectDialog.svelte";
+  import AboutDialog from "./AboutDialog.svelte";
   import Toasts from "./Toasts.svelte";
   import Splitter from "./Splitter.svelte";
 
@@ -150,6 +151,7 @@
   {#if ui.palette}<CommandPalette />{/if}
   {#if ui.settings}<SettingsDialog />{/if}
   {#if ui.newProject}<NewProjectDialog />{/if}
+  {#if ui.about}<AboutDialog />{/if}
   <Toasts />
 </div>
 

@@ -124,8 +124,14 @@ export async function openUrl(url: string) {
     window.open(url, "_blank", "noopener");
     return;
   }
-  const { openUrl } = await import("@tauri-apps/plugin-opener");
-  await openUrl(url);
+  try {
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(url);
+  } catch (e) {
+    // Never fail silently: say what didn't open and offer the address.
+    const { toast } = await import("./toasts.svelte");
+    toast({ kind: "error", source: "KernTeX", title: "Couldn't open the link in your browser", body: `${url}\n\n${String(e)}` });
+  }
 }
 
 export function joinPath(root: string, rel: string) {
