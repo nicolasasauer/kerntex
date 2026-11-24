@@ -6,8 +6,11 @@
 [![Tauri 2](https://img.shields.io/badge/Tauri-2-24c8db?logo=tauri&logoColor=white)](https://tauri.app)
 [![CI](https://github.com/nicolasasauer/kerntex/actions/workflows/ci.yml/badge.svg)](https://github.com/nicolasasauer/kerntex/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Website](https://img.shields.io/badge/website-kerntex.nicolas--iot.eu-1f2a5c)](https://kerntex.nicolas-iot.eu)
 
 A fast, modern, local LaTeX and Typst editor — file tree, editor and live PDF side by side, with clear error messages and built-in engines. No account, no cloud, nothing else to install. **Written in Rust.**
+
+**Website & downloads: [kerntex.nicolas-iot.eu](https://kerntex.nicolas-iot.eu)**
 
 <p align="center">
   <img src="docs/screenshots/light.png" alt="KernTeX in light mode" width="49%">
@@ -16,7 +19,7 @@ A fast, modern, local LaTeX and Typst editor — file tree, editor and live PDF 
 
 ## Quickstart
 
-1. **Download** the installer for your system from the [Releases page](https://github.com/nicolasasauer/kerntex/releases) (Windows `.exe`/`.msi`, Linux `.AppImage`/`.deb`).
+1. **Download** the installer for your system from [kerntex.nicolas-iot.eu](https://kerntex.nicolas-iot.eu) or the [Releases page](https://github.com/nicolasasauer/kerntex/releases) (Windows `.exe`/`.msi`, Linux `.AppImage`/`.deb`).
 2. **Open KernTeX.** The first start opens a compiled example project that tours LaTeX.
 3. **Click “New project”** — or drag a project folder or an Overleaf ZIP onto the window.
 
