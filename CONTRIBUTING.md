@@ -12,7 +12,7 @@ npm run setup:tectonic
 npm run tauri dev
 ```
 
-For UI-only work, `npm run dev` serves the interface in a normal browser at http://localhost:1420 with an in-memory mock backend (`src/lib/mock/`). Add `?demo` to the URL to open the example project right away.
+For UI-only work, `npm run dev` serves the interface in a normal browser at http://localhost:1420 with an in-memory mock backend (`src/lib/mock/`). Add `?demo` to the URL to open the example project right away, or `?demo=problems` to also fill the problems panel with made-up warnings.
 
 ## Project layout
 

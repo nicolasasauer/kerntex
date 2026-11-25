@@ -571,6 +571,9 @@ mod tests {
             assert!(res.ok && res.pdf_path.is_some(), "{}: {errors:?}\n{}", root.display(), &res.log[res.log.len().saturating_sub(3000)..]);
             let undefined: Vec<_> = res.diagnostics.iter().filter(|d| d.message.contains("undefined")).collect();
             assert!(undefined.is_empty(), "{}: unresolved refs {undefined:?}", root.display());
+            // A new user must not be greeted by warnings in a document we ship.
+            let warnings: Vec<_> = res.diagnostics.iter().filter(|d| d.severity == Severity::Warning).collect();
+            assert!(warnings.is_empty(), "{}: {warnings:?}", root.display());
             assert!(res.details.document_class.is_some(), "{:?}", res.details);
             let uses_packages = std::fs::read_to_string(root.join("main.tex")).unwrap().contains("\\usepackage");
             assert_eq!(!res.details.packages.is_empty(), uses_packages, "{:?}", res.details);
@@ -634,6 +637,8 @@ mod tests {
         assert!(res.details.program.as_deref().is_some_and(|p| p.contains("XeTeX")), "{:?}", res.details.program);
         let undefined: Vec<_> = res.diagnostics.iter().filter(|d| d.message.contains("undefined")).collect();
         assert!(undefined.is_empty(), "unresolved refs/citations: {undefined:?}");
+        let warnings: Vec<_> = res.diagnostics.iter().filter(|d| d.severity == Severity::Warning).collect();
+        assert!(warnings.is_empty(), "the example project must be free of warnings: {warnings:?}");
 
         // A broken document reports file, line and a hint.
         project::write_text(&root, "broken.tex", "\\documentclass{article}\n\\begin{document}\nx \\foo y\n\\end{document}\n").unwrap();

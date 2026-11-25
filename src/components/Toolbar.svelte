@@ -12,6 +12,7 @@
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import Download from "@lucide/svelte/icons/download";
   import Bot from "@lucide/svelte/icons/bot";
+  import FileMenu from "./FileMenu.svelte";
   import { mcp, agentName } from "../lib/mcp.svelte";
   import { ws } from "../lib/workspace.svelte";
   import { settings, effectiveTheme } from "../lib/settings.svelte";
@@ -42,12 +43,19 @@
 
 <header class="toolbar">
   <div class="left">
-    <div class="brand" title="KernTeX">
+    <button
+      class="brand"
+      title={ws.project ? "Start screen (closes the project)" : "KernTeX"}
+      aria-label="Start screen"
+      disabled={!ws.project}
+      onclick={() => ws.closeProject()}
+    >
       <svg viewBox="0 0 512 512" width="22" height="22" aria-hidden="true">
         <rect width="512" height="512" rx="112" fill="#1f2a5c"/>
   <g transform="translate(0 6)"><g fill="#fbf7ef"><path transform="translate(64.85 312) scale(0.30000 -0.30000)" d="M852 0V47H823C770 47 767 51 755 67L485 421L725 621C747 639 789 639 819 639H836V686C796 683 739 683 734 683C696 683 624 683 588 686V639C601 639 621 639 646 634C662 630 650 631 659 628L289 319V639H397V686C359 683 261 683 218 683C175 683 77 683 39 686V639H147V47H39V0C77 3 175 3 218 3C261 3 359 3 397 0V47H289V257L389 340L595 69C600 63 600 61 603 55C585 47 565 47 530 47V0C571 3 661 3 706 3C746 3 815 3 852 0Z"/></g><g fill="#ffc94d"><path transform="translate(215.00 394) scale(0.30000 -0.30000)" d="M757 434 736 675H63L42 434H89C98 547 108 628 252 628H329V47H176V0C230 3 341 3 400 3C459 3 570 3 624 0V47H471V628H547C690 628 700 548 710 434Z"/></g></g>
       </svg>
-    </div>
+    </button>
+    <FileMenu />
     {#if ws.project}
       <button class="icon-btn" class:on={settings.layout.treeOpen} title="Toggle file tree ({fmt('Mod+B')})" aria-label="Toggle file tree" onclick={() => (settings.layout.treeOpen = !settings.layout.treeOpen)}>
         <PanelLeft size={17} />
@@ -188,7 +196,23 @@
   .brand {
     display: grid;
     place-items: center;
+    flex: none;
     width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    cursor: pointer;
+  }
+  .brand:disabled {
+    cursor: default;
+  }
+  .brand:not(:disabled):hover {
+    background: var(--hover);
+  }
+  .brand:not(:disabled):active {
+    transform: scale(0.94);
   }
   .title {
     font-weight: 600;

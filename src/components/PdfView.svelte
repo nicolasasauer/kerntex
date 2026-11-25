@@ -6,9 +6,10 @@
   import FileWarning from "@lucide/svelte/icons/file-warning";
   import { ws } from "../lib/workspace.svelte";
   import { settings } from "../lib/settings.svelte";
-  import { api, joinPath, revealInFolder, toAppError } from "../lib/api";
+  import { api, joinPath, openUrl, revealInFolder, toAppError } from "../lib/api";
   import type { PDFDocumentProxy } from "pdfjs-dist";
   import { loadPdfjs } from "../lib/pdfjs";
+  import { pageLinks, resolveDest, type PdfLink } from "../lib/pdfLinks";
 
   /** A document point (page + fraction of that page) and where it sits in the viewport. */
   type Anchor = { index: number; fx: number; fy: number; px: number; py: number };
@@ -51,16 +52,51 @@
     return z;
   }
 
-  async function renderPage(canvas: HTMLCanvasElement, index: number, gen: number, s: number) {
+  async function renderPage(box: HTMLDivElement, index: number, gen: number, s: number) {
     if (!doc || gen !== generation) return;
     const page = await doc.getPage(index + 1);
     if (gen !== generation) return;
     const dpr = window.devicePixelRatio || 1;
     const viewport = page.getViewport({ scale: s * dpr });
+    const canvas = box.querySelector("canvas")!;
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
     await page.render({ canvas, canvasContext: canvas.getContext("2d")!, viewport }).promise.catch(() => {});
-    canvas.dataset.rendered = "1";
+    // The observer may ask for a page that is already being drawn: add its links once.
+    if (box.dataset.rendered) return;
+    box.dataset.rendered = "1";
+    const links = await pageLinks(page).catch(() => []);
+    box.append(...links.map(linkButton));
+  }
+
+  function linkButton(link: PdfLink): HTMLButtonElement {
+    const b = document.createElement("button");
+    b.className = "pdflink";
+    Object.assign(b.style, { left: `${link.left}%`, top: `${link.top}%`, width: `${link.width}%`, height: `${link.height}%` });
+    b.title = "url" in link ? link.url : "Go to this place in the PDF";
+    b.setAttribute("aria-label", b.title);
+    b.onclick = () => void followLink(link);
+    return b;
+  }
+
+  async function followLink(link: PdfLink) {
+    if ("url" in link) return openUrl(link.url);
+    if (!doc) return;
+    if ("action" in link) {
+      const to = { FirstPage: 1, PrevPage: currentPage - 1, NextPage: currentPage + 1, LastPage: pageCount }[link.action];
+      if (to != null) scrollToPage(to - 1, 0);
+      return;
+    }
+    const target = await resolveDest(doc, link.dest).catch(() => null);
+    if (target) scrollToPage(target.index, target.fy);
+  }
+
+  function scrollToPage(index: number, fy: number) {
+    const page = layer?.querySelector<HTMLDivElement>(`.page[data-index="${index}"]`);
+    if (!scroller || !page) return;
+    const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Leave a little room above the target so it doesn't stick to the edge.
+    scroller.scrollTo({ top: page.offsetTop + fy * page.offsetHeight - 24, behavior: smooth ? "smooth" : "auto" });
   }
 
   function applyTransform() {
@@ -79,7 +115,7 @@
   /** Remembers which spot of which page is under viewport point (px, py). */
   function captureAnchor(px: number, py: number): Anchor | null {
     if (!scroller || !layer) return null;
-    const pages = layer.querySelectorAll<HTMLCanvasElement>("canvas.page");
+    const pages = layer.querySelectorAll<HTMLDivElement>(".page");
     if (pages.length === 0) return null;
     const u = toLayer(px, py);
     let c = pages[0];
@@ -108,23 +144,24 @@
     next.className = "layer incoming";
     next.style.padding = `${PAD}px`;
     next.style.gap = `${GAP}px`;
-    const canvases: HTMLCanvasElement[] = [];
+    const boxes: HTMLDivElement[] = [];
     for (let i = 0; i < sizes.length; i++) {
-      const c = document.createElement("canvas");
+      const c = document.createElement("div");
       c.className = "page";
       c.style.width = `${Math.floor(sizes[i].w * s)}px`;
       c.style.height = `${Math.floor(sizes[i].h * s)}px`;
       c.dataset.index = String(i);
+      c.appendChild(document.createElement("canvas"));
       next.appendChild(c);
-      canvases.push(c);
+      boxes.push(c);
     }
     scroller.appendChild(next);
 
     // Scroll so the anchored spot lands where it was on screen; shift the old
     // layer by the same amount so it stays visually still until the swap.
-    if (a && canvases.length > 0) {
-      const sameIndex = a.index < canvases.length;
-      const c = canvases[sameIndex ? a.index : canvases.length - 1];
+    if (a && boxes.length > 0) {
+      const sameIndex = a.index < boxes.length;
+      const c = boxes[sameIndex ? a.index : boxes.length - 1];
       const left0 = scroller.scrollLeft;
       const top0 = scroller.scrollTop;
       scroller.scrollLeft = c.offsetLeft + a.fx * c.offsetWidth - a.px;
@@ -142,7 +179,7 @@
     observer = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
-          const c = e.target as HTMLCanvasElement;
+          const c = e.target as HTMLDivElement;
           if (e.isIntersecting && !c.dataset.rendered) renderPage(c, Number(c.dataset.index), gen, s);
         }
         updateCurrentPage();
@@ -151,13 +188,13 @@
     );
     // Render what's visible now, then fade the new layer in.
     const top = scroller.scrollTop, bottom = top + scroller.clientHeight;
-    const visible = canvases.filter((c) => c.offsetTop + c.offsetHeight >= top - 200 && c.offsetTop <= bottom + 200);
+    const visible = boxes.filter((c) => c.offsetTop + c.offsetHeight >= top - 200 && c.offsetTop <= bottom + 200);
     await Promise.all(visible.map((c) => renderPage(c, Number(c.dataset.index), gen, s)));
     if (gen !== generation) {
       next.remove();
       return;
     }
-    canvases.forEach((c) => observer!.observe(c));
+    boxes.forEach((c) => observer!.observe(c));
     const old = layer;
     layer = next;
     layerScale = s;
@@ -182,7 +219,7 @@
   function updateCurrentPage() {
     if (!scroller || !layer) return;
     const mid = scroller.scrollTop + scroller.clientHeight / 3;
-    const pages = layer.querySelectorAll<HTMLCanvasElement>("canvas.page");
+    const pages = layer.querySelectorAll<HTMLDivElement>(".page");
     let n = 1;
     for (const p of pages) {
       if (p.offsetTop <= mid) n = Number(p.dataset.index) + 1;
@@ -426,11 +463,34 @@
     visibility: hidden;
     pointer-events: none;
   }
-  .scroller :global(canvas.page) {
+  .scroller :global(.page) {
+    position: relative;
+    overflow: hidden;
     flex: none;
     background: #fff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 4px 14px rgba(0, 0, 0, 0.08);
     border-radius: 2px;
+  }
+  .scroller :global(.page canvas) {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .scroller :global(.pdflink) {
+    position: absolute;
+    padding: 0;
+    border: none;
+    border-radius: 2px;
+    background: transparent;
+    cursor: pointer;
+  }
+  /* The page is white paper in both themes: a see-through tint keeps the text readable. */
+  .scroller :global(.pdflink:hover),
+  .scroller :global(.pdflink:focus-visible) {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  .scroller :global(.pdflink:active) {
+    background: color-mix(in srgb, var(--accent) 32%, transparent);
   }
   .empty {
     position: absolute;

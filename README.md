@@ -30,6 +30,8 @@ No TeX installation needed: KernTeX ships with [Tectonic](https://tectonic-types
 ## Features
 
 - **Overleaf-style layout** — file tree, editor with tabs, PDF preview, collapsible problems panel; all panels resizable.
+- **File menu** — new, open, import, recent projects and export in the top left; the logo leads back to the start screen.
+- **Clickable PDF links** — table of contents, references and citations jump to their target; web links open in your browser.
 - **Save = compile** — `Ctrl+S` saves and compiles (can be turned off); optional autosave; compiling shows its live progress (“Typesetting (pass 2)”, “Downloading packages – amsmath.sty”) and can be stopped.
 - **Errors you can act on** — every problem says where it came from (LaTeX, a package, BibTeX/Biber, Tectonic, latexmk, the file system), its file and line (click to jump) and how to fix it in plain language. The raw log is one click away.
 - **Missing packages** — the editor notices when you use `\includegraphics`, `\toprule`, `\SI` … without loading the package and offers a one-click fix. Hover `\usepackage{…}` to see what a package does.

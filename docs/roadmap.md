@@ -12,7 +12,7 @@ What KernTeX doesn't do yet, roughly in order of how much it would help. The arc
 | **Calmer auto-compile** | Autosave and "compile on save" are both on by default, so every typing pause of 1.5 s compiles. Feels live, but can be restless for large theses. Idea: compile on autosave only when the last build was fast, or a separate "auto-compile" switch. | open |
 | **Line numbers for missing packages** | TeX reports a missing `.sty` one line *after* the `\usepackage` line. KernTeX could map it back to the `\usepackage` line. | open |
 | **Download progress on the very first compile** | The first Tectonic run shows which package is being downloaded, but no overall progress (%). | open |
-| **Native menu bar** (File / Edit / View) | Some users look there first; today everything is in the toolbar, command palette and context menus. | open |
+| **Native menu bar** (File / Edit / View) | Some users (especially on macOS) look there first; today there is a File button in the toolbar, plus the command palette and context menus. | open |
 | **UI translations** | The UI is English; strings should be collected so German and other languages can be added. | open |
 
 ## Later phases
