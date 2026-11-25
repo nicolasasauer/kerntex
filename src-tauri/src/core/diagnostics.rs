@@ -143,7 +143,7 @@ pub fn parse_tex_log(log: &str) -> Vec<Diagnostic> {
             }
             let ln = extract_input_line(&message);
             let message = strip_input_line(&message);
-            let severity = if ["may have changed", "Rerun", "fall-back bibtex backend"].iter().any(|k| message.contains(k)) {
+            let severity = if ["may have changed", "Rerun"].iter().any(|k| message.contains(k)) || is_bibtex_fallback(&message) {
                 Severity::Info
             } else {
                 Severity::Warning
@@ -294,6 +294,11 @@ fn is_tectonic_noise(msg: &str) -> bool {
         || msg.starts_with("an error occurred while processing")
 }
 
+/// biblatex's note that it runs BibTeX, not Biber ("fall-back BibTeX(8) backend").
+fn is_bibtex_fallback(msg: &str) -> bool {
+    msg.to_lowercase().contains("fall-back bibtex")
+}
+
 /// Follow-up messages that only repeat that TeX gave up after a real error.
 fn is_tex_noise(msg: &str) -> bool {
     let m = msg.trim_start();
@@ -398,7 +403,7 @@ pub fn hint_for(msg: &str) -> Option<String> {
         "\\\\ or \\newline is used where there is no line, e.g. right after a paragraph break. Remove it, or use \\vspace{…} for extra space.".to_string()
     } else if m.contains("Float(s) lost") || m.contains("Not in outer par mode") {
         "A figure or table is placed somewhere floats aren't allowed (e.g. inside a minipage or another float). Move it out, or use [H] from the float package.".to_string()
-    } else if m.contains("fall-back bibtex backend") {
+    } else if is_bibtex_fallback(m) {
         "biblatex uses BibTeX instead of Biber here. That's fine for most documents (and what the built-in Tectonic engine supports); install Biber and remove `backend=bibtex` if you need Biber-only features.".to_string()
     } else if m.contains("Label(s) may have changed") || m.contains("Rerun") {
         "Cross-references changed. KernTeX re-runs automatically; if it persists, compile once more.".to_string()
@@ -571,5 +576,16 @@ mod tests {
         assert_eq!(d[0].line, Some(20));
         assert_eq!(d[0].severity, Severity::Warning);
         assert!(d[0].hint.is_some());
+    }
+
+    #[test]
+    fn biblatex_bibtex_fallback_is_only_a_note() {
+        let log = "Package biblatex Warning: Using fall-back BibTeX(8) backend:
+(biblatex)                functionality may be reduced/unavailable.
+";
+        let d = parse_tex_log(log);
+        assert_eq!(d.len(), 1, "{d:?}");
+        assert_eq!(d[0].severity, Severity::Info);
+        assert!(d[0].hint.as_deref().is_some_and(|h| h.contains("Biber")), "{d:?}");
     }
 }
