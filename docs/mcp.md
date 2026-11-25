@@ -2,6 +2,8 @@
 
 KernTeX will optionally expose the open project to AI agents through the [Model Context Protocol](https://modelcontextprotocol.io). **It is off by default** and nothing in v0.1 implements it yet; this document fixes the interface so the architecture keeps room for it.
 
+Research and the current implementation plan (November 2026): [mcp-research.md](mcp-research.md).
+
 ## Enabling
 
 - **In the app:** *Settings → Enable MCP server*.
