@@ -155,7 +155,11 @@ fn field(entry: &str, name: &str) -> Option<String> {
                 '}' => depth -= 1,
                 _ => {}
             }
-            if quoted { depth == 0 && c == '"' } else { depth < 0 }
+            if quoted {
+                depth == 0 && c == '"'
+            } else {
+                depth < 0
+            }
         })?;
         return Some(v[..end.0].to_string());
     }
@@ -212,11 +216,7 @@ fn family_names(value: &str) -> Vec<String> {
         .filter_map(|name| {
             let name = name.join(" ");
             let parts = split_top(&name, |c| c == ',');
-            let family = if parts.len() > 1 {
-                parts[0]
-            } else {
-                split_top(&name, char::is_whitespace).last().copied().unwrap_or("")
-            };
+            let family = if parts.len() > 1 { parts[0] } else { split_top(&name, char::is_whitespace).last().copied().unwrap_or("") };
             Some(clean(family)).filter(|f| !f.is_empty())
         })
         .collect()
