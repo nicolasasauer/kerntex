@@ -122,6 +122,9 @@
     <button class="icon-btn" title="Switch to {effectiveTheme() === 'dark' ? 'light' : 'dark'} mode" aria-label="Toggle theme" onclick={toggleTheme}>
       {#if effectiveTheme() === "dark"}<Sun size={17} />{:else}<Moon size={17} />{/if}
     </button>
+    {#if mcp.clients.length === 0}
+      <button class="icon-btn" title="AI assistants — let Claude, Cursor or VS Code work on your document" aria-label="AI assistants" onclick={() => (mcp.dialog = true)}><Bot size={17} /></button>
+    {/if}
     <button class="icon-btn" title="Settings ({fmt('Mod+,')})" aria-label="Settings" onclick={() => (ui.settings = true)}><Settings size={17} /></button>
     {#if ws.project}
       <button class="icon-btn" class:on={settings.layout.pdfOpen} title="Toggle PDF preview ({fmt('Mod+Shift+P')})" aria-label="Toggle PDF preview" onclick={() => (settings.layout.pdfOpen = !settings.layout.pdfOpen)}>

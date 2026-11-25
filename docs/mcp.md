@@ -6,7 +6,7 @@ Background, research and design decisions: [mcp-research.md](mcp-research.md).
 
 ## Setting it up
 
-1. In KernTeX: **Command palette (`Ctrl+K`) → “AI assistants”** (or *Settings → AI assistants → Set up…*).
+1. In KernTeX: click the **robot icon** in the toolbar, or **Command palette (`Ctrl+K`) → “AI assistants”**. The start screen links there too, and the example projects mention it.
 2. Click **Connect** next to your assistant:
    - **Claude Code** — KernTeX runs `claude mcp add --scope user kerntex -- <kerntex-mcp>` for you (or copy the command).
    - **Cursor / VS Code** — opens the app's own “Install MCP server” dialog; confirm it there.

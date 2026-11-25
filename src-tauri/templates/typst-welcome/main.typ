@@ -129,6 +129,7 @@ Typst is also a small programming language:
 = KernTeX tips
 / Ctrl+S: Save and compile.
 / Ctrl+K: Command palette — every action, searchable.
+/ AI assistants: Let Claude, Cursor or VS Code read, edit and compile this document: Ctrl+K → "AI assistants". Off until you connect one.
 / Problems panel: Click an error to jump to it; Typst marks the exact spot.
 / Packages: `#import "@preview/name:version"` — downloaded once, then cached.
 
