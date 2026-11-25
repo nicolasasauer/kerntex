@@ -34,7 +34,10 @@
   </Resources>
 
   <Applications>
-    <Application Id="KernTeX" Executable="kerntex.exe" EntryPoint="Windows.FullTrustApplication">
+    <!-- SupportsMultipleInstances: required for the console execution alias below
+         (kerntex-mcp runs once per connected AI assistant), and matches the
+         other installers, which allow several KernTeX windows. -->
+    <Application Id="KernTeX" Executable="kerntex.exe" EntryPoint="Windows.FullTrustApplication" desktop4:SupportsMultipleInstances="true">
       <uap:VisualElements
         DisplayName="KernTeX"
         Description="A fast, modern, local LaTeX editor"
