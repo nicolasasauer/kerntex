@@ -25,6 +25,7 @@ const dirs = new Set(["images", "chapters"]);
 let settings: Record<string, unknown> = { version: 1 };
 const listeners = new Map<string, ((p: unknown) => void)[]>();
 let cancelFlag = false;
+const demoProblems = typeof location !== "undefined" && new URLSearchParams(location.search).get("demo") === "problems";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const err = (title: string, hint?: string) => ({ source: "fileSystem", title, detail: null, hint: hint ?? null });
@@ -86,8 +87,11 @@ async function compile(req: CompileRequest): Promise<CompileResult> {
       if (pkg) diagnostics.push({ severity: "error", source: "LaTeX", file: path, line: i + 1, message: `LaTeX Error: File \`${pkg[1]}.sty' not found`, hint: `LaTeX can't find “${pkg[1]}.sty”.` });
     });
   }
-  diagnostics.push({ severity: "warning", source: "LaTeX", file: "main.tex", line: 137, message: "Overfull \\hbox (27.6pt too wide) in paragraph at lines 135--139", hint: "A line sticks out into the margin. Rephrase it, allow hyphenation (e.g. long URLs with \\url{…}), or load \\usepackage{microtype}." });
-  diagnostics.push({ severity: "info", source: "hyperref", file: "main.tex", line: 31, message: "Token not allowed in a PDF string (Unicode): removing `\\textsf'", hint: null });
+  // `?demo=problems` adds made-up entries for working on the problems panel.
+  if (demoProblems) {
+    diagnostics.push({ severity: "warning", source: "LaTeX", file: "main.tex", line: 137, message: "Overfull \\hbox (27.6pt too wide) in paragraph at lines 135--139", hint: "A line sticks out into the margin. Rephrase it, allow hyphenation (e.g. long URLs with \\url{…}), or load \\usepackage{microtype}." });
+    diagnostics.push({ severity: "info", source: "hyperref", file: "main.tex", line: 31, message: "Token not allowed in a PDF string (Unicode): removing `\\textsf'", hint: null });
+  }
   const ok = !diagnostics.some((d) => d.severity === "error");
   return { ok, canceled: false, pdfPath: `${ROOT}/.kerntex/out/main.pdf`, diagnostics, durationMs: Math.round(performance.now() - start), log: "This is a mock log.\n(./main.tex\nLaTeX Warning: ...\n)", engineLabel: req.engine === "tectonic" ? "Tectonic" : "latexmk (pdfLaTeX)", details: sampleDetails as BuildDetails };
 }
