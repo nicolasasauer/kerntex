@@ -23,8 +23,8 @@ Without these variables the workflow still builds an MSIX (with a placeholder id
 
 ## Each release
 
-1. Bump `version` in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; merge to `main`.
-2. Publish a GitHub release with a new tag `vX.Y.Z` (or push the tag). The workflow builds everything and attaches the `.msix`.
+1. Run `npm run version:set -- X.Y.Z` (updates every file that states the version); merge to `main`.
+2. Publish a GitHub release with a new tag `vX.Y.Z` (or push the tag). The workflow stops if the tag and the project version differ; otherwise it builds everything and attaches the `.msix`.
 3. In Partner Center → *New submission* → *Packages*: upload the `.msix`. The Store requires each version to be higher than the last; the fourth number is always `0`.
 4. Store listing (first time): all texts (English and German), answers for the age rating, properties and the certification notes are in [store-listing.md](store-listing.md); screenshots (1920×1080) in `docs/store/`; privacy policy in [PRIVACY.md](../PRIVACY.md).
 5. Age rating questionnaire, pricing (free), submit.

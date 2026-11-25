@@ -22,6 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Installer names and the app's own version come from the project files, not from the tag.
+      - name: Tag matches the project version
+        if: github.ref_type == 'tag'
+        run: node scripts/version.mjs --check "${{ github.ref_name }}"
+
       - name: Linux system packages
         if: runner.os == 'Linux'
         run: |
