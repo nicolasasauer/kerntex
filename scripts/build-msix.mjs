@@ -102,6 +102,15 @@ function main() {
     tectonic = found ? join(bins, found) : null;
   }
 
+  // kerntex-mcp (AI assistants, MCP): next to the exe after a Tauri or workspace build, else from binaries/.
+  let mcp = join(target, "kerntex-mcp.exe");
+  if (!existsSync(mcp)) {
+    const bins = join(root, "src-tauri", "binaries");
+    const found = existsSync(bins) ? readdirSync(bins).find((f) => /^kerntex-mcp-.*windows.*\.exe$/.test(f)) : null;
+    mcp = found ? join(bins, found) : null;
+  }
+  if (!mcp) throw new Error("kerntex-mcp.exe not found. Build it first: npm run build:mcp (or cargo build --workspace).");
+
   const version = msixVersion(JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version);
   const identity = identityFromEnv(process.env);
 
@@ -109,6 +118,7 @@ function main() {
   rmSync(layout, { recursive: true, force: true });
   mkdirSync(layout, { recursive: true });
   copyFileSync(exe, join(layout, "kerntex.exe"));
+  copyFileSync(mcp, join(layout, "kerntex-mcp.exe"));
   if (tectonic) copyFileSync(tectonic, join(layout, "tectonic.exe"));
   else console.warn("⚠ Tectonic not found — the package will need a TeX distribution on the user's machine. Run `npm run setup:tectonic` first.");
   cpSync(join(root, "src-tauri", "msix", "Assets"), join(layout, "Assets"), { recursive: true });

@@ -20,7 +20,7 @@ What KernTeX doesn't do yet, roughly in order of how much it would help. The arc
 All tracked as [GitHub issues](https://github.com/nicolasasauer/kerntex/issues), labelled by version.
 
 - **v0.2** — SyncTeX, file watcher, spell checking
-- **v0.3** — MCP server ([docs/mcp.md](mcp.md)), Git panel
+- **v0.3** — Git panel (the MCP server for AI assistants is done: [docs/mcp.md](mcp.md))
 - **v0.4** — device sync and real-time collaboration via a self-hostable server (`kerntex-sync`)
 - **Microsoft Store** — MSIX package is built by the release workflow; see [docs/microsoft-store.md](microsoft-store.md)
 - **Android / tablet** — same app on Android tablets and phones (Tauri 2 supports Android). Goal: **compile on the device**, so no server is required. A self-hosted server (the v0.4 relay) is an optional extra for syncing and for devices that can't compile locally — never a requirement, and never a server you don't control.
@@ -28,6 +28,8 @@ All tracked as [GitHub issues](https://github.com/nicolasasauer/kerntex/issues),
 - **Later** — macOS, code signing, auto-update
 
 ## Done since v0.1 planning
+
+- MCP server: AI assistants (Claude Code, Claude Desktop, Cursor, VS Code …) can read, edit (undoably), search and compile the open project; one-click setup, activity list, read-only mode. See [docs/mcp.md](mcp.md).
 
 - Add files by drag & drop onto the file tree (into the folder under the pointer) or via *Add files…*; name clashes become `name-2.ext`, nothing is overwritten.
 - Preview for images and PDF figures, with "Insert figure" and "Copy `\includegraphics`".

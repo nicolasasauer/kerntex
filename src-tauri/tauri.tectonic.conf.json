@@ -1,7 +1,8 @@
 {
   "bundle": {
     "externalBin": [
-      "binaries/tectonic"
+      "binaries/tectonic",
+      "binaries/kerntex-mcp"
     ]
   }
 }

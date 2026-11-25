@@ -59,18 +59,18 @@ jobs:
 
       - name: cargo fmt
         working-directory: src-tauri
-        run: cargo fmt --check
+        run: cargo fmt --all --check
 
       - name: cargo clippy
         working-directory: src-tauri
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: cargo test
         working-directory: src-tauri
-        run: cargo test -- --nocapture
+        run: cargo test --workspace -- --nocapture
 
       - name: MSIX package builds (Windows)
         if: runner.os == 'Windows'
         run: |
-          cargo build --manifest-path src-tauri/Cargo.toml
+          cargo build --workspace --manifest-path src-tauri/Cargo.toml
           node scripts/build-msix.mjs --profile debug

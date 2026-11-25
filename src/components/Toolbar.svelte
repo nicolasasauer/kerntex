@@ -11,6 +11,8 @@
   import CircleX from "@lucide/svelte/icons/circle-x";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import Download from "@lucide/svelte/icons/download";
+  import Bot from "@lucide/svelte/icons/bot";
+  import { mcp, agentName } from "../lib/mcp.svelte";
   import { ws } from "../lib/workspace.svelte";
   import { settings, effectiveTheme } from "../lib/settings.svelte";
   import { ui, fmt, modKey } from "../lib/commands.svelte";
@@ -106,6 +108,11 @@
   {/if}
 
   <div class="right">
+    {#if mcp.clients.length > 0}
+      <button class="agent" onclick={() => (mcp.dialog = true)} title="An AI assistant is connected to KernTeX — click to see what it did or to disconnect it">
+        <Bot size={15} /> <span>{agentName()}</span>
+      </button>
+    {/if}
     {#if ws.project}
       <button class="icon-btn" title="Export PDF" aria-label="Export PDF" onclick={() => ws.exportPdf()}><Download size={17} /></button>
     {/if}
@@ -115,6 +122,9 @@
     <button class="icon-btn" title="Switch to {effectiveTheme() === 'dark' ? 'light' : 'dark'} mode" aria-label="Toggle theme" onclick={toggleTheme}>
       {#if effectiveTheme() === "dark"}<Sun size={17} />{:else}<Moon size={17} />{/if}
     </button>
+    {#if mcp.clients.length === 0}
+      <button class="icon-btn" title="AI assistants — let Claude, Cursor or VS Code work on your document" aria-label="AI assistants" onclick={() => (mcp.dialog = true)}><Bot size={17} /></button>
+    {/if}
     <button class="icon-btn" title="Settings ({fmt('Mod+,')})" aria-label="Settings" onclick={() => (ui.settings = true)}><Settings size={17} /></button>
     {#if ws.project}
       <button class="icon-btn" class:on={settings.layout.pdfOpen} title="Toggle PDF preview ({fmt('Mod+Shift+P')})" aria-label="Toggle PDF preview" onclick={() => (settings.layout.pdfOpen = !settings.layout.pdfOpen)}>
@@ -125,6 +135,34 @@
 </header>
 
 <style>
+  .agent {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    max-width: 200px;
+    padding: 0 10px;
+    border: 1px solid var(--success);
+    border-radius: 999px;
+    background: var(--success-soft);
+    color: var(--success);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--dur) var(--ease);
+  }
+  .agent span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .agent:hover {
+    filter: brightness(0.97);
+  }
+  .agent:active {
+    transform: scale(0.97);
+  }
   .toolbar {
     flex: none;
     display: grid;

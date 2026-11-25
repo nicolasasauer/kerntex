@@ -5,6 +5,7 @@
   import { ws } from "../lib/workspace.svelte";
   import type { Engine, TexFlavor } from "../lib/types";
   import { APP_VERSION } from "../lib/about";
+  import { mcp, agentName } from "../lib/mcp.svelte";
 
   const p = $derived(ws.project);
 
@@ -82,6 +83,14 @@
       <p class="engines muted">
         Tectonic: {ws.engines?.tectonic ? "found" : "not found"} · latexmk: {ws.engines?.latexmk ? "found" : "not found"}
       </p>
+    </section>
+
+    <section>
+      <h3>AI assistants</h3>
+      <div class="row">
+        <label for="mcp-open">Claude, Cursor, VS Code … <small>{mcp.clients.length > 0 ? `${agentName()} connected` : settings.mcpEnabled ? "Allowed — no assistant connected" : "Off"}</small></label>
+        <button id="mcp-open" class="btn" onclick={() => { ui.settings = false; mcp.dialog = true; }}>Set up…</button>
+      </div>
     </section>
 
     {#if p}
@@ -196,35 +205,6 @@
   .num span {
     width: 36px;
     font-variant-numeric: tabular-nums;
-  }
-  .switch {
-    appearance: none;
-    width: 36px;
-    height: 20px;
-    border-radius: 999px;
-    background: var(--border-strong);
-    position: relative;
-    cursor: pointer;
-    transition: background var(--dur) var(--ease);
-    flex: none;
-  }
-  .switch::after {
-    content: "";
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    transition: transform var(--dur) var(--ease);
-  }
-  .switch:checked {
-    background: var(--accent);
-  }
-  .switch:checked::after {
-    transform: translateX(16px);
   }
   .engines {
     font-size: 12px;

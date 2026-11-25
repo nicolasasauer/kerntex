@@ -174,7 +174,7 @@ pub fn detect_main(root: &Path, tree: &[FileNode]) -> Option<String> {
             score += 5;
         }
         score -= rel.matches('/').count() as i32 * 3;
-        if best.as_ref().map_or(true, |(s, _)| score > *s) {
+        if best.as_ref().is_none_or(|(s, _)| score > *s) {
             best = Some((score, rel));
         }
     }
@@ -209,7 +209,7 @@ fn detect_typst_main(root: &Path, tree: &[FileNode]) -> Option<String> {
             score += 2;
         }
         score -= rel.matches('/').count() as i32 * 3;
-        if best.as_ref().map_or(true, |(s, _)| score > *s) {
+        if best.as_ref().is_none_or(|(s, _)| score > *s) {
             best = Some((score, rel.clone()));
         }
     }

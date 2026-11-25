@@ -2,7 +2,7 @@
 // backend is loaded in dev builds so the UI can be developed and screenshot.
 
 import type {
-  AppError, CompileRequest, CompileResult, EngineStatus, FileNode, ProjectInfo,
+  AppError, CompileRequest, CompileResult, EngineStatus, FileNode, McpActivity, McpClient, McpRequest, McpSetup, ProjectInfo,
   ProjectRefs, ProjectSettings, Progress, Template,
 } from "./types";
 
@@ -74,7 +74,30 @@ export const api = {
   compile: (request: CompileRequest) => call<CompileResult>("compile", { request }),
   cancelCompile: () => call<boolean>("cancel_compile"),
   onProgress: async (cb: (p: Progress) => void) => (await load()).listen("compile://progress", (p) => cb(p as Progress)),
+
+  // MCP server: AI agents working on the open project (src-tauri/src/mcp).
+  mcpConfigure: (config: { enabled: boolean; allowEdits: boolean; root: string | null; name: string | null; mainFile: string | null }) =>
+    call<void>("mcp_configure", { config }),
+  mcpRespond: (id: number, ok: boolean, value: unknown, error: string | null) => call<void>("mcp_respond", { id, ok, value: value ?? null, error }),
+  mcpClients: () => call<McpClient[]>("mcp_clients"),
+  mcpDisconnect: () => call<void>("mcp_disconnect"),
+  mcpSetup: () => call<McpSetup>("mcp_setup"),
+  mcpInstallLink: (target: "cursor" | "vscode") => call<void>("mcp_install_link", { target }),
+  mcpAddToClaudeCode: () => call<string>("mcp_add_to_claude_code"),
+  onMcpRequest: async (cb: (r: McpRequest) => void) => (await load()).listen("mcp://request", (p) => cb(p as McpRequest)),
+  onMcpClients: async (cb: (c: McpClient[]) => void) => (await load()).listen("mcp://clients", (p) => cb(p as McpClient[])),
+  onMcpActivity: async (cb: (a: McpActivity) => void) => (await load()).listen("mcp://activity", (p) => cb(p as McpActivity)),
 };
+
+/** Copies text to the clipboard; false if the browser refused. */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // --- Native dialogs & shell (no-ops / prompts in the browser mock) ---
 
