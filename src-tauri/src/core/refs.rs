@@ -21,6 +21,10 @@ pub struct CiteRef {
     pub kind: String,
     /// Title if found, for the completion detail.
     pub title: Option<String>,
+    /// Family names of the authors (editors if there are none); a trailing
+    /// `others` stays as it is.
+    pub authors: Vec<String>,
+    pub year: Option<String>,
     pub file: String,
 }
 
@@ -32,6 +36,9 @@ pub struct ProjectRefs {
 }
 
 const MAX_FILE_BYTES: u64 = 4 * 1024 * 1024;
+/// A whole reference-manager library (Zotero, JabRef …) with abstracts easily
+/// outgrows the limit for source files.
+const MAX_BIB_BYTES: u64 = 32 * 1024 * 1024;
 
 pub fn scan(root: &Path, tree: &[FileNode]) -> ProjectRefs {
     let mut refs = ProjectRefs::default();
@@ -39,11 +46,13 @@ pub fn scan(root: &Path, tree: &[FileNode]) -> ProjectRefs {
     collect(tree, &mut files);
     for rel in files {
         let Ok(abs) = project::resolve(root, &rel) else { continue };
-        if abs.metadata().map(|m| m.len() > MAX_FILE_BYTES).unwrap_or(true) {
+        let is_bib = rel.to_lowercase().ends_with(".bib");
+        let limit = if is_bib { MAX_BIB_BYTES } else { MAX_FILE_BYTES };
+        if abs.metadata().map(|m| m.len() > limit).unwrap_or(true) {
             continue;
         }
         let Ok(text) = std::fs::read_to_string(&abs) else { continue };
-        if rel.to_lowercase().ends_with(".bib") {
+        if is_bib {
             refs.citations.extend(bib_entries(&text, &rel));
         } else if rel.to_lowercase().ends_with(".typ") {
             refs.labels.extend(typst_labels(&text, &rel));
@@ -104,45 +113,118 @@ pub fn bib_entries(text: &str, file: &str) -> Vec<CiteRef> {
         if key.is_empty() || key.contains(char::is_whitespace) {
             continue;
         }
-        // Title: look within this entry only (until the next '@' at line start).
+        // Fields: look within this entry only (until the next '@' at line start).
         let entry_end = body.find("\n@").unwrap_or(body.len());
-        let title = field(&body[..entry_end], "title");
-        out.push(CiteRef { key: key.to_string(), kind, title, file: file.to_string() });
+        let entry = &body[..entry_end];
+        let title = field(entry, "title").map(|t| clean(&t));
+        let authors = field(entry, "author").or_else(|| field(entry, "editor")).map(|a| family_names(&a)).unwrap_or_default();
+        // biblatex writes `date = {2020-03-01}` instead of `year`.
+        let year = field(entry, "year").or_else(|| field(entry, "date")).and_then(|y| first_year(&y));
+        out.push(CiteRef { key: key.to_string(), kind, title, authors, year, file: file.to_string() });
         rest = &body[comma..];
     }
     out
 }
 
+/// The raw value of a field: `{…}`, `"…"` or a bare word like `1984`.
 fn field(entry: &str, name: &str) -> Option<String> {
-    let lower = entry.to_lowercase();
+    // ASCII lowercasing keeps byte offsets valid for `entry`.
+    let lower = entry.to_ascii_lowercase();
     let mut search = 0;
     while let Some(p) = lower[search..].find(name) {
         let idx = search + p;
-        let before_ok = idx == 0 || !lower.as_bytes()[idx - 1].is_ascii_alphanumeric();
-        let after = lower[idx + name.len()..].trim_start();
-        if before_ok && after.starts_with('=') {
-            let raw = entry[entry.len() - after.len() + 1..].trim_start();
-            let value = if let Some(v) = raw.strip_prefix('{') {
-                let mut depth = 1;
-                let end = v.char_indices().find(|(_, c)| {
-                    match c {
-                        '{' => depth += 1,
-                        '}' => depth -= 1,
-                        _ => {}
-                    }
-                    depth == 0
-                })?;
-                &v[..end.0]
-            } else {
-                let v = raw.strip_prefix('"')?;
-                &v[..v.find('"')?]
-            };
-            let clean: String = value.chars().filter(|c| *c != '{' && *c != '}').collect();
-            return Some(clean.split_whitespace().collect::<Vec<_>>().join(" "));
-        }
         search = idx + name.len();
+        let before_ok = idx == 0 || !lower.as_bytes()[idx - 1].is_ascii_alphanumeric();
+        let after = lower[search..].trim_start();
+        if !before_ok || !after.starts_with('=') {
+            continue;
+        }
+        let raw = entry[entry.len() - after.len() + 1..].trim_start();
+        let quoted = raw.starts_with('"');
+        if !quoted && !raw.starts_with('{') {
+            let end = raw.find(|c: char| !c.is_ascii_alphanumeric()).unwrap_or(raw.len());
+            return Some(raw[..end].to_string());
+        }
+        // The value ends at the matching brace, or at a quote outside braces
+        // (`{\"o}` doesn't end it).
+        let v = &raw[1..];
+        let mut depth = 0i32;
+        let end = v.char_indices().find(|&(_, c)| {
+            match c {
+                '{' => depth += 1,
+                '}' => depth -= 1,
+                _ => {}
+            }
+            if quoted {
+                depth == 0 && c == '"'
+            } else {
+                depth < 0
+            }
+        })?;
+        return Some(v[..end.0].to_string());
     }
     None
+}
+
+/// A field value as readable text: common accents decoded, braces dropped,
+/// whitespace collapsed.
+fn clean(value: &str) -> String {
+    const ACCENTS: [(char, &str, &str); 5] = [
+        ('"', "aeiouyAEIOU", "äëïöüÿÄËÏÖÜ"),
+        ('\'', "aeiouycnszAEIOUCS", "áéíóúýćńśźÁÉÍÓÚĆŚ"),
+        ('`', "aeiouAEIOU", "àèìòùÀÈÌÒÙ"),
+        ('^', "aeiouAEIOU", "âêîôûÂÊÎÔÛ"),
+        ('~', "anoANO", "ãñõÃÑÕ"),
+    ];
+    let mut text = value.replace("{\\ss}", "ß").replace("\\ss{}", "ß");
+    for (mark, plain, accented) in ACCENTS {
+        if !text.contains(&format!("\\{mark}")) {
+            continue;
+        }
+        for (p, a) in plain.chars().zip(accented.chars()) {
+            // `\"{o}` and `\"o`
+            text = text.replace(&format!("\\{mark}{{{p}}}"), &a.to_string()).replace(&format!("\\{mark}{p}"), &a.to_string());
+        }
+    }
+    let text: String = text.chars().filter(|c| *c != '{' && *c != '}').collect();
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Split at `separator` outside braces, so `{Barnes and Noble}` stays whole.
+fn split_top(value: &str, separator: impl Fn(char) -> bool) -> Vec<&str> {
+    let (mut depth, mut start, mut out) = (0i32, 0, Vec::new());
+    for (i, c) in value.char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => depth -= 1,
+            c if depth == 0 && separator(c) => {
+                out.push(&value[start..i]);
+                start = i + c.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    out.push(&value[start..]);
+    out
+}
+
+/// `Knuth, Donald E. and Leslie Lamport` → `Knuth`, `Lamport`.
+fn family_names(value: &str) -> Vec<String> {
+    let words: Vec<&str> = split_top(value, char::is_whitespace).into_iter().filter(|w| !w.is_empty()).collect();
+    words
+        .split(|w| w.eq_ignore_ascii_case("and"))
+        .filter_map(|name| {
+            let name = name.join(" ");
+            let parts = split_top(&name, |c| c == ',');
+            let family = if parts.len() > 1 { parts[0] } else { split_top(&name, char::is_whitespace).last().copied().unwrap_or("") };
+            Some(clean(family)).filter(|f| !f.is_empty())
+        })
+        .collect()
+}
+
+/// The first four-digit run, e.g. from `2020-03-01`.
+fn first_year(value: &str) -> Option<String> {
+    value.split(|c: char| !c.is_ascii_digit()).find(|part| part.len() == 4).map(str::to_string)
 }
 
 /// Typst labels: `<name>` after headings, figures, equations …
@@ -200,6 +282,26 @@ mod tests {
         assert_eq!(e[0].title.as_deref(), Some("The \\TeXbook"));
         assert_eq!(e[1].key, "lamport");
         assert_eq!(e[1].title.as_deref(), Some("LaTeX"));
+    }
+
+    #[test]
+    fn reads_authors_and_year() {
+        let bib = r#"@article{a, author = {Knuth, Donald E. and Leslie Lamport and others}, year = 1984, title = {A}}
+@book{b, editor = {{World Health Organization}}, date = {2020-03-01}}
+@misc{c, author = "M{\"u}ller, J{\'e} and Wei{\ss}, Eva", urldate = {2024-01-01}}
+@misc{d, title = {İstanbul ẞ}, author = {Ada Lovelace}}"#;
+        let e = bib_entries(bib, "refs.bib");
+        let got: Vec<_> = e.iter().map(|e| (e.authors.join("|"), e.year.as_deref())).collect();
+        assert_eq!(
+            got,
+            vec![
+                ("Knuth|Lamport|others".to_string(), Some("1984")),
+                ("World Health Organization".to_string(), Some("2020")),
+                ("Müller|Weiß".to_string(), None),
+                ("Lovelace".to_string(), None),
+            ]
+        );
+        assert_eq!(e[3].title.as_deref(), Some("İstanbul ẞ"));
     }
 
     #[test]

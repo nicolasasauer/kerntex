@@ -15,6 +15,7 @@ import { linter, lintGutter, forceLinting, type Diagnostic as CmDiagnostic } fro
 import { tags as t } from "@lezer/highlight";
 import { COMMANDS, ENVIRONMENTS, ENV_BODY, TYPST_FUNCTIONS } from "./completions";
 import { typst } from "./typst-mode";
+import { searchCitations } from "./citeSearch";
 import { findMissingPackages, usepackageInsertPos, PACKAGE_INFO } from "./packages";
 import type { Diagnostic, ProjectRefs } from "../types";
 
@@ -67,6 +68,7 @@ const baseTheme = EditorView.theme({
   ".cm-tooltip": { backgroundColor: "var(--surface-raised)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "8px", boxShadow: "var(--shadow-lg)", overflow: "hidden" },
   ".cm-tooltip-autocomplete > ul > li[aria-selected]": { backgroundColor: "var(--accent-soft)", color: "var(--text)" },
   ".cm-completionDetail": { color: "var(--text-muted)", fontStyle: "normal", marginLeft: "1em" },
+  ".cm-completionInfo": { whiteSpace: "pre-line" },
   ".cm-panels": { backgroundColor: "var(--surface)", color: "var(--text)", borderColor: "var(--border)" },
   ".cm-panel.cm-search": { padding: "8px 10px", fontFamily: "var(--font-ui)" },
   ".cm-panel.cm-search input, .cm-panel.cm-search button": { fontFamily: "var(--font-ui)", fontSize: "13px" },
@@ -92,15 +94,18 @@ function typstCompletions(host: EditorHost) {
     return snippetCompletion("#" + tpl.replace(/\{\}/g, "${}"), { label, detail, type: "function" });
   });
   return (ctx: CompletionContext) => {
-    const ref = ctx.matchBefore(/@[\w\-.:]*$/);
+    const ref = ctx.matchBefore(/@[\p{L}\p{N}_\-.:]*$/u);
     if (ref && (ref.from === 0 || !/\w/.test(ctx.state.sliceDoc(ref.from - 1, ref.from)))) {
       const refs = host.getRefs();
+      // No validFor: citations are searched anew on every keystroke.
+      const query = ref.text.slice(1);
+      const lower = query.toLowerCase();
       return {
         from: ref.from + 1,
-        validFor: /^[\w\-.:]*$/,
+        filter: false,
         options: [
-          ...refs.labels.map((l) => ({ label: l.name, detail: `${l.file}:${l.line}`, type: "variable" })),
-          ...refs.citations.map((c) => ({ label: c.key, detail: c.title ?? c.kind, type: "text" })),
+          ...refs.labels.filter((l) => l.name.toLowerCase().includes(lower)).map((l) => ({ label: l.name, detail: `${l.file}:${l.line}`, type: "variable" })),
+          ...searchCitations(refs.citations, query),
         ],
       };
     }
@@ -135,10 +140,11 @@ function latexCompletions(host: EditorHost) {
       const from = arg.to - (inner.length - (lastComma + 1));
       const refs = host.getRefs();
       if (/cite/i.test(cmd)) {
-        return {
-          from, validFor: /^[^,}\s]*$/,
-          options: refs.citations.map((c) => ({ label: c.key, detail: c.title ?? c.kind, type: "text", info: `@${c.kind} · ${c.file}` })),
-        };
+        // The query may contain spaces ("knuth 1984"); the chosen key replaces
+        // all of it. filter: false because we match more than the key.
+        const query = inner.slice(lastComma + 1);
+        const start = from + query.length - query.trimStart().length;
+        return { from: start, filter: false, options: searchCitations(refs.citations, query) };
       }
       return {
         from, validFor: /^[^,}\s]*$/,

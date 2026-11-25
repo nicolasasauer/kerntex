@@ -8,7 +8,7 @@ import articleTex from "../../../src-tauri/templates/article.tex?raw";
 import samplePdfUrl from "./sample.pdf?url";
 import exampleImageUrl from "../../../src-tauri/templates/welcome/images/example.png?url";
 import sampleDetails from "./details.json";
-import type { BuildDetails, CompileRequest, CompileResult, Diagnostic, FileNode, ProjectInfo } from "../types";
+import type { BuildDetails, CiteRef, CompileRequest, CompileResult, Diagnostic, FileNode, ProjectInfo } from "../types";
 
 const emptyDetails: BuildDetails = { program: null, format: null, documentClass: null, packages: [], passes: 0, enginePath: null, outDir: null, logPath: null };
 
@@ -160,10 +160,15 @@ async function handle(cmd: string, a: Record<string, any>): Promise<unknown> {
       return (await fetch(a.path.endsWith(".pdf") ? samplePdfUrl : exampleImageUrl)).arrayBuffer();
     case "scan_refs": {
       const labels: { name: string; file: string; line: number }[] = [];
-      const citations: { key: string; kind: string; title: string | null; file: string }[] = [];
+      const citations: CiteRef[] = [];
       for (const [f, t] of files) {
         if (f.endsWith(".tex")) t.split("\n").forEach((l, i) => { for (const m of l.matchAll(/\\label\{([^}]+)\}/g)) labels.push({ name: m[1], file: f, line: i + 1 }); });
-        if (f.endsWith(".bib")) for (const m of t.matchAll(/@(\w+)\{([^,]+),[\s\S]*?title\s*=\s*\{(.+?)\},/g)) citations.push({ kind: m[1].toLowerCase(), key: m[2].trim(), title: m[3].replace(/[{}]/g, ""), file: f });
+        // Rough stand-in for the Rust parser (core/refs.rs).
+        if (f.endsWith(".bib")) for (const m of t.matchAll(/@(\w+)\{([^,]+),([\s\S]*?)(?=\n@|$)/g)) {
+          const field = (name: string) => m[3].match(new RegExp(`\\b${name}\\s*=\\s*\\{(.+?)\\},?\\s*\\n`))?.[1].replace(/[{}]/g, "") ?? null;
+          const authors = field("author")?.split(" and ").map((n) => (n.includes(",") ? n.split(",")[0] : n.split(" ").pop()!)) ?? [];
+          citations.push({ kind: m[1].toLowerCase(), key: m[2].trim(), title: field("title"), authors, year: field("year"), file: f });
+        }
       }
       return { labels, citations };
     }

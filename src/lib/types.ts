@@ -118,6 +118,9 @@ export interface CiteRef {
   key: string;
   kind: string;
   title: string | null;
+  /** Family names; a trailing "others" stays as it is. */
+  authors: string[];
+  year: string | null;
   file: string;
 }
 

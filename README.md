@@ -33,7 +33,7 @@ No TeX installation needed: KernTeX ships with [Tectonic](https://tectonic-types
 - **Save = compile** — `Ctrl+S` saves and compiles (can be turned off); optional autosave; compiling shows its live progress (“Typesetting (pass 2)”, “Downloading packages – amsmath.sty”) and can be stopped.
 - **Errors you can act on** — every problem says where it came from (LaTeX, a package, BibTeX/Biber, Tectonic, latexmk, the file system), its file and line (click to jump) and how to fix it in plain language. The raw log is one click away.
 - **Missing packages** — the editor notices when you use `\includegraphics`, `\toprule`, `\SI` … without loading the package and offers a one-click fix. Hover `\usepackage{…}` to see what a package does.
-- **Smart completion** — commands, environments, `\ref{` with all labels of the project and `\cite{` with all keys from your `.bib` files.
+- **Smart completion** — commands, environments, `\ref{` with all labels of the project and `\cite{` with all entries from your `.bib` files, searchable by key, author, year or title.
 - **Command palette** (`Ctrl+K`) with every action and its shortcut.
 - **Light and dark mode**, following your system by default. Respects “reduce motion”.
 - **LaTeX and Typst** — write classic LaTeX, or try [Typst](https://typst.app), a modern alternative with simpler markup that compiles in milliseconds. Both engines are built in; Typst errors are underlined exactly where they are. New projects let you pick the format; *Take the Typst tour* on the start screen shows what it can do.
@@ -84,6 +84,17 @@ KernTeX works on ordinary folders — there's no special project format.
 - **For arXiv and journals:** *Export clean ZIP* leaves out auxiliary files but keeps the `.bbl`.
 
 Per-project choices (main file, engine) are stored in `.kerntex/project.json` — commit it so they travel with the project via Git. Build output in `.kerntex/out/` is git-ignored in new projects.
+
+## Cite from Zotero
+
+KernTeX reads the `.bib` files in your project, so a Zotero library works without a plugin in KernTeX:
+
+1. Install [Better BibTeX](https://retorque.re/zotero-better-bibtex/) in Zotero.
+2. Right-click your library or a collection and choose *Export*. Pick **Better BibLaTeX** or **Better BibTeX**, tick **Keep updated** and save the file into your project folder, e.g. as `references.bib`.
+3. Reference that file in your document (`\addbibresource{references.bib}`, `\bibliography{references}` or Typst's `#bibliography("references.bib")`).
+4. Type `\cite{` (Typst: `@`) and search by key, author, year or title.
+
+Zotero keeps the file up to date; KernTeX picks up new entries the next time you save. The same works with any tool that writes `.bib` files, such as JabRef.
 
 ## Use your own TeX distribution
 
