@@ -1,12 +1,12 @@
 // CodeMirror 6 setup for LaTeX. One EditorView; each open file keeps its own
 // EditorState (so undo history survives tab switches).
 
-import { EditorState, Compartment, StateEffect, type Extension } from "@codemirror/state";
+import { EditorState, Compartment, StateEffect, Transaction, type Extension } from "@codemirror/state";
 import {
   EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection,
   dropCursor, rectangularSelection, highlightSpecialChars, hoverTooltip,
 } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab, isolateHistory } from "@codemirror/commands";
 import { StreamLanguage, bracketMatching, syntaxHighlighting, HighlightStyle, indentOnInput, foldGutter, foldKeymap } from "@codemirror/language";
 import { stex } from "@codemirror/legacy-modes/mode/stex";
 import { search, searchKeymap, highlightSelectionMatches } from "@codemirror/search";
@@ -250,6 +250,12 @@ export interface EditorController {
   refreshLint(): void;
   setOptions(o: { fontSize: number; wrap: boolean }): void;
   insertAt(path: string, pos: number, insert: string): void;
+  /**
+   * Replaces the text of an open file with `text` as one undoable step that
+   * only touches the changed range (cursor and scroll position stay put).
+   * Used for edits made by AI agents.
+   */
+  applyText(path: string, text: string): boolean;
   /** Inserts at the cursor of the current file (on a fresh line) and selects nothing. */
   insertAtCursor(text: string): void;
   focus(): void;
@@ -323,6 +329,28 @@ export function createEditor(parent: HTMLElement, host: EditorHost, opts: { font
         const st = states.get(path);
         if (st) states.set(path, st.update({ changes: { from: pos, insert } }).state);
       }
+    },
+    applyText(path, text) {
+      const st = path === current ? view.state : states.get(path);
+      if (!st) return false;
+      const old = st.doc.toString();
+      if (old === text) return true;
+      // Smallest change: skip the common start and end.
+      let from = 0;
+      while (from < old.length && from < text.length && old[from] === text[from]) from++;
+      let oldEnd = old.length;
+      let newEnd = text.length;
+      while (oldEnd > from && newEnd > from && old[oldEnd - 1] === text[newEnd - 1]) {
+        oldEnd--;
+        newEnd--;
+      }
+      const spec = {
+        changes: { from, to: oldEnd, insert: text.slice(from, newEnd) },
+        annotations: [isolateHistory.of("full"), Transaction.userEvent.of("input.agent")],
+      };
+      if (path === current) view.dispatch(spec);
+      else states.set(path, st.update(spec).state);
+      return true;
     },
     insertAtCursor(text) {
       const { doc } = view.state;

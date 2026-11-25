@@ -46,6 +46,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run setup:tectonic
 
+      - name: Build kerntex-mcp (lets AI assistants connect)
+        run: npm run build:mcp
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

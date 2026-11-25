@@ -11,7 +11,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "tauri": "tauri",
     "setup:tectonic": "node scripts/fetch-tectonic.mjs",
-    "test:scripts": "node --test scripts/fetch-tectonic.test.mjs scripts/build-msix.test.mjs",
+    "build:mcp": "node scripts/build-mcp-proxy.mjs",
+    "test:scripts": "node --test scripts/fetch-tectonic.test.mjs scripts/build-msix.test.mjs scripts/build-mcp-proxy.test.mjs",
     "build:msix": "node scripts/build-msix.mjs"
   },
   "dependencies": {

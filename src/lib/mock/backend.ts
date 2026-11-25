@@ -183,8 +183,36 @@ async function handle(cmd: string, a: Record<string, any>): Promise<unknown> {
     case "cancel_compile":
       cancelFlag = true;
       return true;
+    // MCP: `?demo=agent` pretends Claude Code is connected (for UI work and screenshots).
+    case "mcp_configure":
+    case "mcp_respond":
+    case "mcp_install_link":
+      return null;
+    case "mcp_clients":
+      return mockAgent ? [{ id: 1, name: "Claude Code" }] : [];
+    case "mcp_disconnect":
+      mockAgent = false;
+      emit("mcp://clients", []);
+      return null;
+    case "mcp_setup":
+      return { command: "/opt/kerntex/kerntex-mcp", problem: null, endpoint: "/run/user/1000/kerntex-mcp.sock", claudeCode: "/home/demo/.local/bin/claude" };
+    case "mcp_add_to_claude_code":
+      return "Added stdio MCP server kerntex";
   }
   throw { source: "app", title: `Unknown command ${cmd}`, detail: null, hint: null };
+}
+
+let mockAgent = typeof location !== "undefined" && new URLSearchParams(location.search).get("demo") === "agent";
+if (mockAgent) {
+  setTimeout(() => {
+    const steps = [
+      { tool: "list_files", detail: "" },
+      { tool: "read_file", detail: "main.tex" },
+      { tool: "edit_file", detail: "main.tex (2 changes)" },
+      { tool: "compile", detail: "0 errors, 1 warning" },
+    ];
+    steps.forEach((a, i) => setTimeout(() => emit("mcp://activity", { client: "Claude Code", ok: true, error: null, ...a }), i * 150));
+  }, 1500);
 }
 
 export async function listen(event: string, cb: (p: unknown) => void) {

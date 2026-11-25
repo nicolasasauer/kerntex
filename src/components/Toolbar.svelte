@@ -11,6 +11,8 @@
   import CircleX from "@lucide/svelte/icons/circle-x";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import Download from "@lucide/svelte/icons/download";
+  import Bot from "@lucide/svelte/icons/bot";
+  import { mcp, agentName } from "../lib/mcp.svelte";
   import { ws } from "../lib/workspace.svelte";
   import { settings, effectiveTheme } from "../lib/settings.svelte";
   import { ui, fmt, modKey } from "../lib/commands.svelte";
@@ -106,6 +108,11 @@
   {/if}
 
   <div class="right">
+    {#if mcp.clients.length > 0}
+      <button class="agent" onclick={() => (mcp.dialog = true)} title="An AI assistant is connected to KernTeX — click to see what it did or to disconnect it">
+        <Bot size={15} /> <span>{agentName()}</span>
+      </button>
+    {/if}
     {#if ws.project}
       <button class="icon-btn" title="Export PDF" aria-label="Export PDF" onclick={() => ws.exportPdf()}><Download size={17} /></button>
     {/if}
@@ -125,6 +132,34 @@
 </header>
 
 <style>
+  .agent {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    max-width: 200px;
+    padding: 0 10px;
+    border: 1px solid var(--success);
+    border-radius: 999px;
+    background: var(--success-soft);
+    color: var(--success);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--dur) var(--ease);
+  }
+  .agent span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .agent:hover {
+    filter: brightness(0.97);
+  }
+  .agent:active {
+    transform: scale(0.97);
+  }
   .toolbar {
     flex: none;
     display: grid;

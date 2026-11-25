@@ -6,6 +6,7 @@ import { settings } from "./settings.svelte";
 import { openUrl } from "./api";
 import { LINKS, reportProblemUrl } from "./about";
 import { openSearchPanel } from "@codemirror/search";
+import { mcp, disconnectAgents } from "./mcp.svelte";
 
 export const ui = $state({
   palette: false,
@@ -62,6 +63,9 @@ export const commands: Command[] = [
   { id: "buildDetails", title: "Show build details (engine, packages, versions)", group: "Build", when: hasProject, run: () => { settings.layout.problemsOpen = true; settings.layout.problems = Math.max(settings.layout.problems, 320); ui.bottomTab = "details"; } },
   { id: "addFiles", title: "Add files to project…", group: "File", when: hasProject, run: () => ws.addFiles("") },
   { id: "find", title: "Find / replace in file", group: "Edit", shortcut: "Mod+F", when: () => ws.active != null, run: () => { if (ws.editor) openSearchPanel(ws.editor.view); } },
+  { id: "aiAssistants", title: "AI assistants: connect Claude, Cursor, VS Code (MCP)…", group: "AI", run: () => (mcp.dialog = true) },
+  { id: "aiToggle", title: "AI assistants: allow / stop sharing the project", group: "AI", run: () => (settings.mcpEnabled = !settings.mcpEnabled) },
+  { id: "aiDisconnect", title: "AI assistants: disconnect", group: "AI", when: () => mcp.clients.length > 0, run: () => disconnectAgents() },
   { id: "settings", title: "Settings", group: "Preferences", shortcut: "Mod+,", run: () => (ui.settings = true) },
   { id: "themeLight", title: "Theme: Light", group: "Preferences", run: () => (settings.theme = "light") },
   { id: "themeDark", title: "Theme: Dark", group: "Preferences", run: () => (settings.theme = "dark") },

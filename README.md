@@ -38,6 +38,7 @@ No TeX installation needed: KernTeX ships with [Tectonic](https://tectonic-types
 - **Light and dark mode**, following your system by default. Respects “reduce motion”.
 - **LaTeX and Typst** — write classic LaTeX, or try [Typst](https://typst.app), a modern alternative with simpler markup that compiles in milliseconds. Both engines are built in; Typst errors are underlined exactly where they are. New projects let you pick the format; *Take the Typst tour* on the start screen shows what it can do.
 - **Images in two clicks** — drag files onto the file tree (or *Add files…*), preview images and PDF figures, insert a ready-made `figure` with one click.
+- **Works with AI assistants** — let Claude Code, Claude Desktop, Cursor or VS Code read your project, make edits you see live and can undo, compile and fix errors (MCP). Off by default; one click to connect, one click to disconnect. See [docs/mcp.md](docs/mcp.md).
 - **Look under the hood** — *Build details* shows the engine and its version, the document class and every package with its version, plus links to the output folder and the full log. No log flood: it's there when you open it.
 - **Safe with your files** — atomic saves, autosave, deleting goes to the system trash, nothing is overwritten without asking. Build output lives in `.kerntex/out/`, keeping your folder clean.
 
@@ -64,7 +65,7 @@ No TeX installation needed: KernTeX ships with [Tectonic](https://tectonic-types
 
 ## Built with
 
-KernTeX's core is **written in Rust**: file access with path protection, running and cancelling the TeX engine, the log parser that turns TeX output into clear, actionable messages, ZIP import/export and build details. It has no dependency on the UI framework, so the same code can back a CLI or the planned MCP server.
+KernTeX's core is **written in Rust**: file access with path protection, running and cancelling the TeX engine, the log parser that turns TeX output into clear, actionable messages, ZIP import/export and build details. It has no dependency on the UI framework, so the same code also backs the MCP server for AI assistants.
 
 | Part | Technology |
 | --- | --- |
@@ -106,7 +107,7 @@ npm run tauri build -- --config src-tauri/tauri.tectonic.conf.json   # installer
 
 ## Contributing
 
-Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the UX rules in [DESIGN.md](DESIGN.md). A planned MCP interface for AI agents is described in [docs/mcp.md](docs/mcp.md); open points are tracked in [docs/roadmap.md](docs/roadmap.md) and as [issues](https://github.com/nicolasasauer/kerntex/issues). Releasing to the Microsoft Store is described in [docs/microsoft-store.md](docs/microsoft-store.md).
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the UX rules in [DESIGN.md](DESIGN.md). How AI assistants connect is described in [docs/mcp.md](docs/mcp.md); open points are tracked in [docs/roadmap.md](docs/roadmap.md) and as [issues](https://github.com/nicolasasauer/kerntex/issues). Releasing to the Microsoft Store is described in [docs/microsoft-store.md](docs/microsoft-store.md).
 
 ## License
 

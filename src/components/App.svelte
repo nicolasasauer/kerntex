@@ -15,6 +15,8 @@
   import SettingsDialog from "./SettingsDialog.svelte";
   import NewProjectDialog from "./NewProjectDialog.svelte";
   import AboutDialog from "./AboutDialog.svelte";
+  import McpDialog from "./McpDialog.svelte";
+  import { mcp, initMcp } from "../lib/mcp.svelte";
   import Toasts from "./Toasts.svelte";
   import Splitter from "./Splitter.svelte";
 
@@ -46,6 +48,7 @@
 
   onMount(() => {
     ws.init();
+    initMcp();
     // Dev-only handle for automated UI checks (stripped from production builds).
     if (import.meta.env.DEV) (window as unknown as { __kerntex: unknown }).__kerntex = ws;
     let unlisten: (() => void) | undefined;
@@ -152,6 +155,7 @@
   {#if ui.settings}<SettingsDialog />{/if}
   {#if ui.newProject}<NewProjectDialog />{/if}
   {#if ui.about}<AboutDialog />{/if}
+  {#if mcp.dialog}<McpDialog />{/if}
   <Toasts />
 </div>
 

@@ -1,6 +1,6 @@
 # KernTeX Privacy Policy
 
-*Last updated: 23 November 2026 (Typst packages added)*
+*Last updated: 25 November 2026 (AI assistants added)*
 
 KernTeX is a LaTeX and Typst editor that runs entirely on your computer. It has no user accounts, no analytics, no telemetry, no ads and no tracking.
 
@@ -19,6 +19,10 @@ KernTeX itself does not contact any server. Three things can use the internet:
 3. **Links you click** (for example "Look up on CTAN" or "KernTeX on GitHub") open in your web browser; the browser's and the website's privacy policies apply.
 
 If you use your own TeX distribution (latexmk with TeX Live or MiKTeX), its own package manager decides when to go online.
+
+## AI assistants (optional, off by default)
+
+If you turn on *AI assistants* and connect one (for example Claude Code, Claude Desktop, Cursor or VS Code), that assistant can read and change files of the project open in KernTeX. KernTeX hands the data to the assistant on your computer only (through a local pipe, not the network). **The assistant itself may send what it reads to its AI service** — its provider's privacy policy applies to that. You can make assistants read-only, see everything they did in KernTeX, and disconnect them with one click.
 
 ## Children
 
@@ -41,6 +45,7 @@ KernTeX ist ein LaTeX- und Typst-Editor, der vollständig auf deinem Computer l�
 - **Deine Dokumente** bleiben in den Ordnern, die du öffnest oder anlegst. Einstellungen und die Liste zuletzt geöffneter Projekte werden nur lokal gespeichert. KernTeX überträgt davon nichts.
 - **Die eingebaute TeX-Engine (Tectonic)** lädt die LaTeX-Pakete, die ein Dokument braucht, vom Paketserver des Tectonic-Projekts herunter – immer beim ersten Kompilieren, später nur für noch fehlende Pakete. Dieser Server erhält dabei wie jeder Webserver deine IP-Adresse und die Namen der angeforderten Paketdateien, **nicht** deine Dokumente. Betreiber ist das Open-Source-Projekt Tectonic, nicht KernTeX.
 - **Typst-Pakete:** Importiert ein Typst-Dokument ein Paket (`#import "@preview/…"`), lädt der eingebaute Typst-Compiler es einmalig von Typst Universe (packages.typst.org) und speichert es lokal. Der Server erhält dabei deine IP-Adresse und den Paketnamen, nicht deine Dokumente.
+- **KI-Assistenten (optional, standardmäßig aus):** Schaltest du *AI assistants* ein und verbindest einen Assistenten (z. B. Claude Code, Claude Desktop, Cursor oder VS Code), kann er Dateien des in KernTeX geöffneten Projekts lesen und ändern. KernTeX übergibt die Daten nur lokal auf deinem Computer, nicht über das Netzwerk. **Der Assistent selbst kann das Gelesene an seinen KI-Dienst senden** – dafür gilt die Datenschutzerklärung seines Anbieters. Du kannst Assistenten auf Nur-Lesen stellen, alles Getane in KernTeX einsehen und sie mit einem Klick trennen.
 - **Links**, die du anklickst (z. B. zu CTAN oder GitHub), öffnen sich in deinem Browser; dort gelten die Datenschutzbestimmungen des Browsers und der Website.
 
 Fragen: [github.com/nicolasasauer/kerntex/issues](https://github.com/nicolasasauer/kerntex/issues).
