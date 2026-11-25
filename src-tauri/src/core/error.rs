@@ -15,6 +15,8 @@ pub enum ErrorSource {
     Engine,
     /// Importing or exporting ZIP archives.
     Archive,
+    /// The system `git` (version control).
+    Git,
     /// A bug or invalid request inside KernTeX itself.
     App,
 }

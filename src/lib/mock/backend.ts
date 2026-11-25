@@ -203,6 +203,8 @@ async function handle(cmd: string, a: Record<string, any>): Promise<unknown> {
       return { command: "/opt/kerntex/kerntex-mcp", problem: null, endpoint: "/run/user/1000/kerntex-mcp.sock", claudeCode: "/home/demo/.local/bin/claude" };
     case "mcp_add_to_claude_code":
       return "Added stdio MCP server kerntex";
+    default:
+      if (cmd.startsWith("git_")) return gitMock(cmd, a);
   }
   throw { source: "app", title: `Unknown command ${cmd}`, detail: null, hint: null };
 }
@@ -225,4 +227,96 @@ export async function listen(event: string, cb: (p: unknown) => void) {
   list.push(cb);
   listeners.set(event, list);
   return () => listeners.set(event, (listeners.get(event) ?? []).filter((x) => x !== cb));
+}
+
+// --- Git (pretend repository; ?nogit starts without one) ---
+
+const gitRepo = { repo: !new URLSearchParams(location.search).has("nogit"), remoteUrl: "https://github.com/demo/welcome-to-kerntex.git" as string | null, ahead: 0, identity: true };
+const committed = new Map(files);
+committed.set("main.tex", welcomeTex.replace("\\section{", "\\section{Old ").replace(/\n[^\n]*\n/, "\n"));
+committed.delete("chapters/appendix.tex");
+let lastCommit = { hash: "3f2c1ab", subject: "Add bibliography", time: Math.floor(Date.now() / 1000) - 7200 };
+let gitCancel = false;
+
+function gitChanges() {
+  const changes: { path: string; oldPath: string | null; kind: string }[] = [];
+  const skip = (p: string) => /\.(aux|log)$/.test(p);
+  for (const [p, t] of files) {
+    if (skip(p)) continue;
+    if (!committed.has(p)) changes.push({ path: p, oldPath: null, kind: "untracked" });
+    else if (committed.get(p) !== t) changes.push({ path: p, oldPath: null, kind: "modified" });
+  }
+  for (const p of committed.keys()) if (!files.has(p) && !skip(p)) changes.push({ path: p, oldPath: null, kind: "deleted" });
+  return changes.sort((x, y) => x.path.localeCompare(y.path));
+}
+
+function mockDiff(path: string) {
+  const a = (committed.get(path) ?? "").split("\n");
+  const b = (files.get(path) ?? "").split("\n");
+  if (!committed.has(path)) return `@@ -0,0 +1,${b.length} @@\n` + b.map((l) => "+" + l).join("\n");
+  let s = 0;
+  while (s < a.length && s < b.length && a[s] === b[s]) s++;
+  let e = 0;
+  while (e < a.length - s && e < b.length - s && a[a.length - 1 - e] === b[b.length - 1 - e]) e++;
+  const from = Math.max(0, s - 3);
+  const ctx = (l: string) => " " + l;
+  const body = [...a.slice(from, s).map(ctx), ...a.slice(s, a.length - e).map((l) => "-" + l), ...b.slice(s, b.length - e).map((l) => "+" + l), ...a.slice(a.length - e, a.length - e + 3).map(ctx)];
+  return `@@ -${from + 1} +${from + 1} @@\n` + body.join("\n");
+}
+
+async function gitMock(cmd: string, a: Record<string, any>): Promise<unknown> {
+  switch (cmd) {
+    case "git_status":
+      return {
+        gitVersion: "git version 2.47.0", repo: gitRepo.repo, branch: gitRepo.repo ? "main" : null,
+        upstream: gitRepo.repo && gitRepo.remoteUrl ? "origin/main" : null, ahead: gitRepo.ahead, behind: 0,
+        remote: gitRepo.remoteUrl ? "origin" : null, remoteUrl: gitRepo.remoteUrl, hasCommits: true,
+        lastCommit: gitRepo.repo ? lastCommit : null, merging: false,
+        identity: gitRepo.identity ? { name: "Demo User", email: "demo@example.com" } : null,
+        changes: gitRepo.repo ? gitChanges() : [],
+      };
+    case "git_diff":
+      return mockDiff(a.path);
+    case "git_suggest_message": {
+      const c = gitChanges();
+      const mod = c.filter((x) => x.kind === "modified").map((x) => x.path.split("/").pop());
+      const add = c.filter((x) => x.kind === "untracked").map((x) => x.path.split("/").pop());
+      const parts = [mod.length ? `Edit “Introduction”${mod.length > 1 ? `, update ${mod.slice(1).join(", ")}` : ""}` : "", add.length ? `add ${add.join(", ")}` : ""].filter(Boolean);
+      return parts.join(", ");
+    }
+    case "git_init":
+      gitRepo.repo = true;
+      return null;
+    case "git_commit":
+      for (const [p, t] of files) committed.set(p, t);
+      for (const p of [...committed.keys()]) if (!files.has(p)) committed.delete(p);
+      lastCommit = { hash: Math.random().toString(16).slice(2, 9), subject: String(a.message).split("\n")[0], time: Math.floor(Date.now() / 1000) };
+      gitRepo.ahead++;
+      await delay(300);
+      return lastCommit;
+    case "git_pull":
+    case "git_push": {
+      gitCancel = false;
+      const steps = cmd === "git_push" ? ["Enumerating objects: 7, done.", "Counting objects: 100% (7/7), done.", "Writing objects:  40% (2/5)", "Writing objects: 100% (5/5), 1.2 KiB, done."] : ["Fetching origin", "Receiving objects: 100% (3/3), done."];
+      for (const line of steps) {
+        if (gitCancel) throw { source: "git", title: `${cmd === "git_push" ? "Push" : "Pull"} canceled`, detail: null, hint: "Nothing was lost. Try again whenever you like." };
+        for (const cb of listeners.get("git://progress") ?? []) cb({ op: cmd.slice(4), line });
+        await delay(500);
+      }
+      if (cmd === "git_push") gitRepo.ahead = 0;
+      return cmd === "git_pull" ? { updated: false, conflicts: [] } : null;
+    }
+    case "git_cancel":
+      gitCancel = true;
+      return true;
+    case "git_set_remote":
+      gitRepo.remoteUrl = a.url;
+      return null;
+    case "git_set_identity":
+      gitRepo.identity = true;
+      return null;
+    case "git_abort_merge":
+      return null;
+  }
+  throw { source: "app", title: `Unknown command ${cmd}`, detail: null, hint: null };
 }

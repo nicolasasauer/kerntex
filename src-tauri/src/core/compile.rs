@@ -421,19 +421,19 @@ fn build_command(req: &CompileRequest, _root: &Path, out_dir: &Path) -> Result<(
 /// No console window on Windows; on Unix the engine gets its own process
 /// group so cancelling also stops the TeX runs latexmk spawns.
 #[cfg(windows)]
-fn hide_window(c: &mut Command) {
+pub(crate) fn hide_window(c: &mut Command) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     c.creation_flags(CREATE_NO_WINDOW);
 }
 #[cfg(unix)]
-fn hide_window(c: &mut Command) {
+pub(crate) fn hide_window(c: &mut Command) {
     use std::os::unix::process::CommandExt;
     c.process_group(0);
 }
 
 /// Kills the engine and everything it started (latexmk → pdflatex, biber …).
-fn kill_tree(child: &mut Child) {
+pub(crate) fn kill_tree(child: &mut Child) {
     #[cfg(unix)]
     {
         // Negative PID = the whole process group created in `hide_window`.

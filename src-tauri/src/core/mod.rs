@@ -8,6 +8,7 @@ pub mod compile;
 pub mod diagnostics;
 pub mod edits;
 pub mod error;
+pub mod git;
 pub mod project;
 pub mod refs;
 pub mod settings;

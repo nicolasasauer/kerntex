@@ -14,6 +14,7 @@
   import Eye2 from "@lucide/svelte/icons/scan-eye";
   import { SvelteSet } from "svelte/reactivity";
   import TreeNode from "./TreeNode.svelte";
+  import SideTabs from "./SideTabs.svelte";
   import InlineInput from "./InlineInput.svelte";
   import ContextMenu, { type MenuEntry } from "./ContextMenu.svelte";
   import { ws, isPreviewable } from "../lib/workspace.svelte";
@@ -87,7 +88,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="filetree" class:drop-root={ui.dropDir === ""} oncontextmenu={(e) => openMenu(e, null)} onkeydown={key}>
   <div class="head">
-    <span class="label">Files</span>
+    <SideTabs />
     <div class="tools">
       <button class="icon-btn" title="New file" aria-label="New file" onclick={() => (ui.treeCreate = { dir: "", kind: "file" })}><FilePlus size={15} /></button>
       <button class="icon-btn" title="New folder" aria-label="New folder" onclick={() => (ui.treeCreate = { dir: "", kind: "folder" })}><FolderPlus size={15} /></button>
@@ -140,15 +141,8 @@
     align-items: center;
     justify-content: space-between;
     height: 36px;
-    padding: 0 6px 0 12px;
+    padding: 0 6px 0 6px;
     border-bottom: 1px solid var(--border);
-  }
-  .label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
   }
   .tools {
     display: flex;

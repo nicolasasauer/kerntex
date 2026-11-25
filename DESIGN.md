@@ -14,7 +14,7 @@ Anything that may take longer than ~300 ms shows a concrete status text, e.g. �
 
 Every message says:
 
-- **where it came from** — LaTeX, a package name, Tectonic, latexmk, BibTeX/Biber, the file system, or KernTeX itself (`AppError.source`, `Diagnostic.source`);
+- **where it came from** — LaTeX, a package name, Tectonic, latexmk, BibTeX/Biber, the file system, Git, or KernTeX itself (`AppError.source`, `Diagnostic.source`);
 - **where it happened** — file and line; one click jumps there;
 - **how to fix it** — a hint in everyday language.
 

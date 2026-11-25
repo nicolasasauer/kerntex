@@ -40,6 +40,7 @@ No TeX installation needed: KernTeX ships with [Tectonic](https://tectonic-types
 - **Images in two clicks** — drag files onto the file tree (or *Add files…*), preview images and PDF figures, insert a ready-made `figure` with one click.
 - **Works with AI assistants** — let Claude Code, Claude Desktop, Cursor or VS Code read your project, make edits you see live and can undo, compile and fix errors (MCP). Off by default; one click to connect, one click to disconnect. See [docs/mcp.md](docs/mcp.md).
 - **Look under the hood** — *Build details* shows the engine and its version, the document class and every package with its version, plus links to the output folder and the full log. No log flood: it's there when you open it.
+- **Git built in** — the *Git* tab next to *Files* shows what changed (with a diff per file), suggests a commit message from the changed sections, and commits and pushes in one click (*Commit & Push*; *Commit* alone is next to it). Pull with one click, conflicts are shown clearly and never resolved silently. Uses the Git on your computer, so your GitHub sign-in (Git Credential Manager), SSH keys and Overleaf Git access just work.
 - **Safe with your files** — atomic saves, autosave, deleting goes to the system trash, nothing is overwritten without asking. Build output lives in `.kerntex/out/`, keeping your folder clean.
 
 ### A quick look

@@ -28,7 +28,7 @@ const defaults = {
   mcpEnabled: false,
   /** When off, agents may read and compile but not change files. */
   mcpAllowEdits: true,
-  layout: { tree: 240, pdf: 0.45, problems: 200, treeOpen: true, pdfOpen: true, problemsOpen: false },
+  layout: { tree: 240, pdf: 0.45, problems: 200, treeOpen: true, pdfOpen: true, problemsOpen: false, side: "files" as "files" | "git" },
 };
 
 export type Settings = typeof defaults;

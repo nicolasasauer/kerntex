@@ -18,7 +18,7 @@ For UI-only work, `npm run dev` serves the interface in a normal browser at http
 
 | Path | What |
 | --- | --- |
-| `src-tauri/src/core/` | All domain logic in plain Rust (no Tauri): project files, compiling, log parsing, ZIP, settings, templates |
+| `src-tauri/src/core/` | All domain logic in plain Rust (no Tauri): project files, compiling, log parsing, ZIP, settings, templates, Git (via the system `git`) |
 | `src-tauri/src/commands.rs` | Thin Tauri command wrappers |
 | `src-tauri/templates/` | New-project templates and the welcome project |
 | `src/lib/` | Frontend state (`workspace.svelte.ts`), API, commands/shortcuts, CodeMirror setup, LaTeX knowledge base |

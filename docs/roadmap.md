@@ -20,7 +20,7 @@ What KernTeX doesn't do yet, roughly in order of how much it would help. The arc
 All tracked as [GitHub issues](https://github.com/nicolasasauer/kerntex/issues), labelled by version.
 
 - **v0.2** — SyncTeX, file watcher, spell checking
-- **v0.3** — Git panel (the MCP server for AI assistants is done: [docs/mcp.md](mcp.md))
+- **v0.3** — Git panel (#13; first step done, see below). Next: sign-in prompt for tokens (`GIT_ASKPASS`), clone from URL, "Sign in with GitHub" / "Publish to GitHub"; later optional local-LLM commit messages (#26). The MCP server for AI assistants is done: [docs/mcp.md](mcp.md)
 - **v0.4** — device sync and real-time collaboration via a self-hostable server (`kerntex-sync`)
 - **Microsoft Store** — MSIX package is built by the release workflow; see [docs/microsoft-store.md](microsoft-store.md)
 - **Android / tablet** — same app on Android tablets and phones (Tauri 2 supports Android). Goal: **compile on the device**, so no server is required. A self-hosted server (the v0.4 relay) is an optional extra for syncing and for devices that can't compile locally — never a requirement, and never a server you don't control.
@@ -29,8 +29,8 @@ All tracked as [GitHub issues](https://github.com/nicolasasauer/kerntex/issues),
 
 ## Done since v0.1 planning
 
+- **Git panel, step 1** (#13): *Git* tab in the sidebar with branch, ahead/behind, changed files with a diff view, rule-based commit message suggestion (names the changed `\section`s), *Commit & Push* (commit → pull → push) and *Commit*, pull, set up Git for a project (with `.gitignore` for `.kerntex/out/`), add a remote URL, set name/email, merge conflicts listed with *Abort merge*. Uses the system `git`; pull/push show progress and can be cancelled.
 - MCP server: AI assistants (Claude Code, Claude Desktop, Cursor, VS Code …) can read, edit (undoably), search and compile the open project; one-click setup, activity list, read-only mode. See [docs/mcp.md](mcp.md).
-
 - Add files by drag & drop onto the file tree (into the folder under the pointer) or via *Add files…*; name clashes become `name-2.ext`, nothing is overwritten.
 - Preview for images and PDF figures, with "Insert figure" and "Copy `\includegraphics`".
 - *Build details* tab: engine and version, TeX program, LaTeX format, document class, every package with version and date (the ones your document loads, and on request their dependencies), links to the output folder, the full log and the Tectonic package cache.

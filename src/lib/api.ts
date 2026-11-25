@@ -3,7 +3,7 @@
 
 import type {
   AppError, CompileRequest, CompileResult, EngineStatus, FileNode, McpActivity, McpClient, McpRequest, McpSetup, ProjectInfo,
-  ProjectRefs, ProjectSettings, Progress, Template,
+  ProjectRefs, ProjectSettings, Progress, Template, GitStatus, CommitInfo, PullResult, GitProgress,
 } from "./types";
 
 type Invoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
@@ -74,6 +74,18 @@ export const api = {
   compile: (request: CompileRequest) => call<CompileResult>("compile", { request }),
   cancelCompile: () => call<boolean>("cancel_compile"),
   onProgress: async (cb: (p: Progress) => void) => (await load()).listen("compile://progress", (p) => cb(p as Progress)),
+  gitStatus: (root: string) => call<GitStatus>("git_status", { root }),
+  gitDiff: (root: string, path: string, oldPath: string | null) => call<string>("git_diff", { root, path, oldPath }),
+  gitSuggestMessage: (root: string) => call<string>("git_suggest_message", { root }),
+  gitInit: (root: string) => call<void>("git_init", { root }),
+  gitCommit: (root: string, message: string) => call<CommitInfo>("git_commit", { root, message }),
+  gitPull: (root: string) => call<PullResult>("git_pull", { root }),
+  gitPush: (root: string) => call<void>("git_push", { root }),
+  gitCancel: () => call<boolean>("git_cancel"),
+  gitSetRemote: (root: string, url: string) => call<void>("git_set_remote", { root, url }),
+  gitSetIdentity: (root: string, name: string, email: string) => call<void>("git_set_identity", { root, name, email }),
+  gitAbortMerge: (root: string) => call<void>("git_abort_merge", { root }),
+  onGitProgress: async (cb: (p: GitProgress) => void) => (await load()).listen("git://progress", (p) => cb(p as GitProgress)),
 
   // MCP server: AI agents working on the open project (src-tauri/src/mcp).
   mcpConfigure: (config: { enabled: boolean; allowEdits: boolean; root: string | null; name: string | null; mainFile: string | null }) =>

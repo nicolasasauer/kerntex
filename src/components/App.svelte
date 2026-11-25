@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
+  import { git } from "../lib/git.svelte";
   import { ws } from "../lib/workspace.svelte";
   import { settings, effectiveTheme } from "../lib/settings.svelte";
   import { ui, handleGlobalKey } from "../lib/commands.svelte";
@@ -8,6 +9,7 @@
   import Toolbar from "./Toolbar.svelte";
   import StartScreen from "./StartScreen.svelte";
   import FileTree from "./FileTree.svelte";
+  import GitPanel from "./GitPanel.svelte";
   import EditorPane from "./EditorPane.svelte";
   import PdfView from "./PdfView.svelte";
   import ProblemsPanel from "./ProblemsPanel.svelte";
@@ -46,9 +48,20 @@
     return row?.dataset.dir ?? "";
   }
 
+  // Git status follows the open project and every write KernTeX makes.
+  $effect(() => {
+    void ws.project?.root;
+    void ws.fsVersion;
+    untrack(() => git.schedule(ws.fsVersion === 0 ? 0 : 400));
+  });
+
   onMount(() => {
     ws.init();
     initMcp();
+    git.init();
+    // Changes made outside KernTeX (terminal, other editors): re-check on focus.
+    const onFocus = () => git.schedule(100);
+    window.addEventListener("focus", onFocus);
     // Dev-only handle for automated UI checks (stripped from production builds).
     if (import.meta.env.DEV) (window as unknown as { __kerntex: unknown }).__kerntex = ws;
     let unlisten: (() => void) | undefined;
@@ -88,6 +101,7 @@
       unlisten?.();
       ws.dispose();
       window.removeEventListener("beforeunload", beforeUnload);
+      window.removeEventListener("focus", onFocus);
     };
   });
 
@@ -103,7 +117,7 @@
     <div class="workspace" bind:this={main}>
       {#if L.treeOpen}
         <aside class="tree" style:width="{L.tree}px">
-          <FileTree />
+          {#if L.side === "git"}<GitPanel />{:else}<FileTree />{/if}
         </aside>
         <Splitter
           dir="x"
