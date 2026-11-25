@@ -5,9 +5,11 @@
     shortcut?: string;
     danger?: boolean;
     disabled?: boolean;
+    /** Tooltip. */
+    title?: string;
     run: () => void;
   }
-  export type MenuEntry = MenuItem | "separator";
+  export type MenuEntry = MenuItem | "separator" | { heading: string };
 </script>
 
 <script lang="ts">
@@ -39,8 +41,10 @@
   {#each items as item}
     {#if item === "separator"}
       <div class="sep" role="separator"></div>
+    {:else if "heading" in item}
+      <div class="heading" role="presentation">{item.heading}</div>
     {:else}
-      <button role="menuitem" class:danger={item.danger} disabled={item.disabled} onclick={() => { onClose(); item.run(); }}>
+      <button role="menuitem" title={item.title} class:danger={item.danger} disabled={item.disabled} onclick={() => { onClose(); item.run(); }}>
         <span class="icon">{#if item.icon}<item.icon size={15} />{/if}</span>
         <span class="label">{item.label}</span>
         {#if item.shortcut}<span class="sc">{item.shortcut}</span>{/if}
@@ -59,6 +63,9 @@
     position: fixed;
     z-index: 61;
     min-width: 210px;
+    max-width: 340px;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
     padding: 5px;
     background: var(--surface-raised);
     border: 1px solid var(--border);
@@ -106,6 +113,17 @@
   }
   .label {
     flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .heading {
+    padding: 4px 8px 2px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
   }
   .sc {
     color: var(--text-faint);
