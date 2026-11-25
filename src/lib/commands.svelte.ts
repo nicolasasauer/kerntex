@@ -2,6 +2,7 @@
 // shortcuts trigger them, and tooltips show their shortcut.
 
 import { ws } from "./workspace.svelte";
+import { git } from "./git.svelte";
 import { settings } from "./settings.svelte";
 import { openUrl } from "./api";
 import { LINKS, reportProblemUrl } from "./about";
@@ -37,6 +38,12 @@ export function fmt(shortcut?: string) {
 }
 
 const hasProject = () => ws.project != null;
+const hasRepo = () => ws.project != null && git.status?.repo === true;
+
+function showGit() {
+  settings.layout.treeOpen = true;
+  settings.layout.side = "git";
+}
 
 export const commands: Command[] = [
   { id: "compile", title: "Compile", group: "Build", shortcut: "Mod+Enter", when: hasProject, run: () => ws.compile() },
@@ -52,10 +59,15 @@ export const commands: Command[] = [
   { id: "closeProject", title: "Close project", group: "Project", when: hasProject, run: () => ws.closeProject() },
   { id: "newFile", title: "New file…", group: "File", when: hasProject, run: () => { settings.layout.treeOpen = true; ui.treeCreate = { dir: "", kind: "file" }; } },
   { id: "newFolder", title: "New folder…", group: "File", when: hasProject, run: () => { settings.layout.treeOpen = true; ui.treeCreate = { dir: "", kind: "folder" }; } },
+  { id: "git", title: "Show Git panel", group: "Git", shortcut: "Mod+Shift+G", when: hasProject, run: showGit },
+  { id: "gitCommitPush", title: "Git: Commit & push", group: "Git", when: hasRepo, run: () => { showGit(); git.commit(true); } },
+  { id: "gitCommit", title: "Git: Commit only (don't push)", group: "Git", when: hasRepo, run: () => { showGit(); git.commit(false); } },
+  { id: "gitPull", title: "Git: Pull (get changes from the remote)", group: "Git", when: () => hasRepo() && git.status?.upstream != null, run: () => { showGit(); git.pull(); } },
+  { id: "gitPush", title: "Git: Push", group: "Git", when: () => hasRepo() && git.status?.remote != null, run: () => { showGit(); git.push(); } },
   { id: "exportPdf", title: "Export PDF…", group: "Export", when: hasProject, run: () => ws.exportPdf() },
   { id: "exportZip", title: "Export project as ZIP…", group: "Export", when: hasProject, run: () => ws.exportZip(false) },
   { id: "exportCleanZip", title: "Export clean ZIP (for arXiv / journals)…", group: "Export", when: hasProject, run: () => ws.exportZip(true) },
-  { id: "toggleTree", title: "Toggle file tree", group: "View", shortcut: "Mod+B", when: hasProject, run: () => (settings.layout.treeOpen = !settings.layout.treeOpen) },
+  { id: "toggleTree", title: "Toggle sidebar (files / Git)", group: "View", shortcut: "Mod+B", when: hasProject, run: () => (settings.layout.treeOpen = !settings.layout.treeOpen) },
   { id: "togglePdf", title: "Toggle PDF preview", group: "View", shortcut: "Mod+Shift+P", when: hasProject, run: () => (settings.layout.pdfOpen = !settings.layout.pdfOpen) },
   { id: "toggleProblems", title: "Toggle problems panel", group: "View", shortcut: "Mod+J", when: hasProject, run: () => (settings.layout.problemsOpen = !settings.layout.problemsOpen) },
   { id: "rawLog", title: "Show raw log", group: "Build", when: hasProject, run: () => { settings.layout.problemsOpen = true; ui.bottomTab = "log"; } },

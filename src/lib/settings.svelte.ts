@@ -24,7 +24,7 @@ const defaults = {
   pdfZoom: "fit-width" as "fit-width" | "fit-page" | number,
   recent: [] as RecentProject[],
   welcomed: false,
-  layout: { tree: 240, pdf: 0.45, problems: 200, treeOpen: true, pdfOpen: true, problemsOpen: false },
+  layout: { tree: 240, pdf: 0.45, problems: 200, treeOpen: true, pdfOpen: true, problemsOpen: false, side: "files" as "files" | "git" },
 };
 
 export type Settings = typeof defaults;

@@ -1,6 +1,6 @@
 // Mirrors the serde types in src-tauri/src/core (camelCase).
 
-export type ErrorSource = "fileSystem" | "engine" | "archive" | "app";
+export type ErrorSource = "fileSystem" | "engine" | "archive" | "git" | "app";
 
 export interface AppError {
   source: ErrorSource;
@@ -129,3 +129,46 @@ export interface ProjectRefs {
 export type Template =
   | "blank" | "article" | "report" | "beamer" | "letter"
   | "typstBlank" | "typstArticle" | "typstReport" | "typstSlides" | "typstLetter";
+
+// --- Git (src-tauri/src/core/git.rs) ---
+
+export type ChangeKind = "modified" | "added" | "deleted" | "renamed" | "untracked" | "conflicted";
+
+export interface GitChange {
+  path: string;
+  oldPath: string | null;
+  kind: ChangeKind;
+}
+
+export interface CommitInfo {
+  hash: string;
+  subject: string;
+  /** Unix seconds. */
+  time: number;
+}
+
+export interface GitStatus {
+  gitVersion: string | null;
+  repo: boolean;
+  branch: string | null;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  remote: string | null;
+  remoteUrl: string | null;
+  hasCommits: boolean;
+  lastCommit: CommitInfo | null;
+  merging: boolean;
+  identity: { name: string; email: string } | null;
+  changes: GitChange[];
+}
+
+export interface PullResult {
+  updated: boolean;
+  conflicts: string[];
+}
+
+export interface GitProgress {
+  op: "pull" | "push";
+  line: string;
+}

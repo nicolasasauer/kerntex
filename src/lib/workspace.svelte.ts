@@ -53,6 +53,8 @@ class Workspace {
   pdfVersion = $state(0);
   engines: EngineStatus | null = $state(null);
   busy: string | null = $state(null);
+  /** Bumped after KernTeX writes to the project folder (the Git panel refreshes on it). */
+  fsVersion = $state(0);
   editor: EditorController | null = null;
   /** Most recent text tab: where "Insert figure" goes. */
   lastTextTab: string | null = null;
@@ -230,9 +232,45 @@ class Workspace {
     if (!p) return;
     try {
       p.tree = await api.readTree(p.root);
+      this.fsVersion++;
     } catch (e) {
       toastError(toAppError(e));
     }
+  }
+
+  /** After files changed on disk (Git pull, merge abort): update the tree and open tabs. */
+  async reloadFromDisk() {
+    const p = this.project;
+    if (!p) return;
+    await this.refreshTree();
+    let reopened = false;
+    for (const t of [...this.tabs]) {
+      if (t.kind !== "text" || t.dirty) continue;
+      let text: string;
+      try {
+        text = await api.readFile(p.root, t.path);
+      } catch {
+        // Gone (deleted by the pull): close the tab without saving it back.
+        this.tabs.splice(this.tabs.indexOf(t), 1);
+        this.editor?.close(t.path);
+        if (this.active === t.path) this.active = null;
+        continue;
+      }
+      if (text === t.saved) continue;
+      t.saved = text;
+      this.editor?.replaceAll(t.path, text);
+      // Tabs in the background lose their editor state on replaceAll; recreate it.
+      if (this.editor && !this.editor.has(t.path)) {
+        this.editor.open(t.path, text);
+        reopened = true;
+      }
+    }
+    if (!this.active && this.tabs[0]) this.activate(this.tabs[0].path);
+    else if (reopened) {
+      const show = this.tabs.find((t) => t.path === this.active)?.kind === "text" ? this.active : this.lastTextTab;
+      if (show && this.tabs.some((t) => t.path === show)) this.editor?.open(show, "");
+    }
+    this.loadRefs();
   }
 
   async loadRefs() {
@@ -329,6 +367,7 @@ class Workspace {
     }
     try {
       await api.writeFile(p.root, path, text);
+      this.fsVersion++;
       tab.saved = text;
       tab.dirty = this.editor?.text(path) !== text;
       return true;

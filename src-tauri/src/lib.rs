@@ -34,6 +34,17 @@ pub fn run() {
             commands::export_pdf,
             commands::compile,
             commands::cancel_compile,
+            commands::git_status,
+            commands::git_diff,
+            commands::git_suggest_message,
+            commands::git_init,
+            commands::git_commit,
+            commands::git_pull,
+            commands::git_push,
+            commands::git_cancel,
+            commands::git_set_remote,
+            commands::git_set_identity,
+            commands::git_abort_merge,
         ])
         .run(tauri::generate_context!())
         .expect("error while running KernTeX");

@@ -32,6 +32,7 @@ const SOURCE_LABEL: Record<AppError["source"], string> = {
   fileSystem: "File system",
   engine: "TeX engine",
   archive: "ZIP",
+  git: "Git",
   app: "KernTeX",
 };
 

@@ -4,6 +4,7 @@
 use crate::core::archive;
 use crate::core::compile::{self, CancelHandle, CompileRequest, CompileResult, EngineStatus};
 use crate::core::error::{AppError, ErrorSource, Result};
+use crate::core::git::{self, CommitInfo, GitCancel, GitStatus, PullResult};
 use crate::core::project::{self, FileNode, ProjectInfo, BUILD_DIR};
 use crate::core::refs::{self, ProjectRefs};
 use crate::core::settings::{self, ProjectSettings};
@@ -14,6 +15,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 #[derive(Default)]
 pub struct AppState {
     pub compile: CancelHandle,
+    pub git: GitCancel,
 }
 
 /// Runs blocking core work off the main thread.
@@ -208,4 +210,73 @@ pub async fn compile(app: AppHandle, state: State<'_, AppState>, request: Compil
 #[tauri::command]
 pub fn cancel_compile(state: State<'_, AppState>) -> bool {
     state.compile.cancel()
+}
+
+// ---------- Git ----------
+
+#[tauri::command]
+pub async fn git_status(root: String) -> Result<GitStatus> {
+    blocking(move || git::status(Path::new(&root))).await
+}
+
+#[tauri::command]
+pub async fn git_diff(root: String, path: String, old_path: Option<String>) -> Result<String> {
+    blocking(move || git::diff(Path::new(&root), &path, old_path.as_deref())).await
+}
+
+#[tauri::command]
+pub async fn git_suggest_message(root: String) -> Result<String> {
+    blocking(move || git::suggest_message(Path::new(&root))).await
+}
+
+#[tauri::command]
+pub async fn git_init(root: String) -> Result<()> {
+    blocking(move || git::init(Path::new(&root))).await
+}
+
+#[tauri::command]
+pub async fn git_commit(root: String, message: String) -> Result<CommitInfo> {
+    blocking(move || git::commit(Path::new(&root), &message)).await
+}
+
+#[tauri::command]
+pub async fn git_pull(app: AppHandle, state: State<'_, AppState>, root: String) -> Result<PullResult> {
+    let cancel = state.git.clone();
+    blocking(move || {
+        git::pull(Path::new(&root), &cancel, |p| {
+            let _ = app.emit("git://progress", p);
+        })
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_push(app: AppHandle, state: State<'_, AppState>, root: String) -> Result<()> {
+    let cancel = state.git.clone();
+    blocking(move || {
+        git::push(Path::new(&root), &cancel, |p| {
+            let _ = app.emit("git://progress", p);
+        })
+    })
+    .await
+}
+
+#[tauri::command]
+pub fn git_cancel(state: State<'_, AppState>) -> bool {
+    state.git.cancel()
+}
+
+#[tauri::command]
+pub async fn git_set_remote(root: String, url: String) -> Result<()> {
+    blocking(move || git::set_remote(Path::new(&root), &url)).await
+}
+
+#[tauri::command]
+pub async fn git_set_identity(root: String, name: String, email: String) -> Result<()> {
+    blocking(move || git::set_identity(Path::new(&root), &name, &email)).await
+}
+
+#[tauri::command]
+pub async fn git_abort_merge(root: String) -> Result<()> {
+    blocking(move || git::abort_merge(Path::new(&root))).await
 }

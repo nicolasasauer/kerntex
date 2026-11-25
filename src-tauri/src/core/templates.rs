@@ -64,7 +64,7 @@ const WELCOME_FILES: &[(&str, &[u8])] = &[
 
 /// Only build output is ignored; `.kerntex/project.json` (main file, engine)
 /// is meant to be committed so it travels with the project.
-fn gitignore() -> String {
+pub(crate) fn gitignore() -> String {
     format!("{BUILD_DIR}/out/\n")
 }
 
