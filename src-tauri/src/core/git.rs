@@ -931,12 +931,16 @@ u UU N... 100644 100644 100644 100644 a b c thesis/main.tex\0\
         fs::write(root.join(".kerntex/out/main.pdf"), "pdf").unwrap();
 
         assert!(!status(&root).unwrap().repo);
+        // `init` keeps a configured default branch (some Windows setups use
+        // `master`) and only picks `main` when none is configured.
+        let branch =
+            try_run(&root, &["config", "--get", "init.defaultBranch"]).map(|b| b.trim().to_string()).unwrap_or_else(|| "main".into());
         init(&root).unwrap();
         local_identity(&root);
         assert_eq!(fs::read_to_string(root.join(".gitignore")).unwrap(), ".kerntex/out/\n");
         let st = status(&root).unwrap();
         assert!(st.repo && !st.has_commits);
-        assert_eq!(st.branch.as_deref(), Some("main"));
+        assert_eq!(st.branch.as_deref(), Some(branch.as_str()));
         assert!(st.changes.iter().all(|c| !c.path.starts_with(".kerntex/out")), "{:?}", st.changes);
         assert_eq!(suggest_message(&root).unwrap(), "Initial commit");
         assert!(diff(&root, "main.tex", None).unwrap().contains("+Hello"));
@@ -955,13 +959,13 @@ u UU N... 100644 100644 100644 100644 a b c thesis/main.tex\0\
 
         // Push to a bare remote.
         let remote = base.join("remote.git");
-        git(&base, &["init", "-q", "--bare", "-b", "main", "remote.git"]);
+        git(&base, &["init", "-q", "--bare", "-b", &branch, "remote.git"]);
         assert!(push(&root, &GitCancel::default(), |_| {}).is_err(), "no remote yet");
         set_remote(&root, remote.to_str().unwrap()).unwrap();
         commit(&root, "Edit intro").unwrap();
         push(&root, &GitCancel::default(), |_| {}).unwrap();
         let st = status(&root).unwrap();
-        assert_eq!(st.upstream.as_deref(), Some("origin/main"));
+        assert_eq!(st.upstream.as_deref(), Some(format!("origin/{branch}").as_str()));
         assert_eq!(st.remote.as_deref(), Some("origin"));
 
         // Someone else changes the same line.
