@@ -3,7 +3,7 @@ members = ["mcp-proxy"]
 
 [package]
 name = "kerntex"
-version = "0.1.3"
+version = "0.1.6"
 description = "A fast, modern, local LaTeX editor"
 authors = ["Nicolas Sauer"]
 license = "MIT"

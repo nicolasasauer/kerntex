@@ -1,7 +1,7 @@
 {
   "name": "kerntex",
   "private": true,
-  "version": "0.1.3",
+  "version": "0.1.6",
   "description": "A fast, modern, local LaTeX editor.",
   "license": "MIT",
   "type": "module",
@@ -12,7 +12,8 @@
     "tauri": "tauri",
     "setup:tectonic": "node scripts/fetch-tectonic.mjs",
     "build:mcp": "node scripts/build-mcp-proxy.mjs",
-    "test:scripts": "node --test scripts/fetch-tectonic.test.mjs scripts/build-msix.test.mjs scripts/build-mcp-proxy.test.mjs",
+    "test:scripts": "node --test scripts/fetch-tectonic.test.mjs scripts/build-msix.test.mjs scripts/build-mcp-proxy.test.mjs scripts/version.test.mjs",
+    "version:set": "node scripts/version.mjs",
     "build:msix": "node scripts/build-msix.mjs"
   },
   "dependencies": {
