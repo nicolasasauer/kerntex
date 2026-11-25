@@ -44,6 +44,14 @@ pub fn parse_tectonic(output: &str) -> Vec<Diagnostic> {
     let mut i = 0;
     while i < lines.len() {
         let line = lines[i].trim_end();
+        // Tectonic prints the TeX warnings of every pass. Those of an earlier pass
+        // are often stale (undefined refs and citations widen lines until BibTeX
+        // has run); real ones are printed again by the final pass.
+        if line.starts_with("note: Rerunning TeX") {
+            out.retain(|d: &Diagnostic| !(d.severity == Severity::Warning && d.file.is_some()));
+            i += 1;
+            continue;
+        }
         let (severity, rest) = if let Some(r) = line.strip_prefix("error: ") {
             (Severity::Error, r)
         } else if let Some(r) = line.strip_prefix("warning: ") {
@@ -459,6 +467,25 @@ mod tests {
         assert_eq!(d[0].file.as_deref(), Some("chapters/intro.tex"));
         assert_eq!(d[0].line, Some(12));
         assert!(d[0].hint.as_deref().unwrap().contains("\\usepackage"));
+    }
+
+    #[test]
+    fn tectonic_keeps_only_final_pass_warnings() {
+        // Output shape taken from a real Tectonic run: a box that is overfull only
+        // before BibTeX resolves the citations, and one that stays overfull.
+        let out = "note: Running TeX ...\n\
+            warning: main.tex:139: Overfull \\hbox (32.9pt too wide) in paragraph at lines 135--139\n\
+            warning: main.tex:9: Overfull \\hbox (379.5pt too wide) in paragraph at lines 5--9\n\
+            note: Running BibTeX on main.aux ...\n\
+            note: Rerunning TeX because bibtex was run ...\n\
+            warning: main.tex:9: Overfull \\hbox (379.5pt too wide) in paragraph at lines 5--9\n\
+            note: Rerunning TeX because \"main.toc\" changed ...\n\
+            warning: main.tex:9: Overfull \\hbox (379.07pt too wide) in paragraph at lines 5--9\n\
+            note: Running xdvipdfmx ...\n";
+        let d = parse_tectonic(out);
+        assert_eq!(d.len(), 1, "{d:?}");
+        assert_eq!(d[0].line, Some(9));
+        assert!(d[0].message.contains("379.07pt"));
     }
 
     #[test]
