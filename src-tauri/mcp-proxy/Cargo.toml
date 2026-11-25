@@ -1,6 +1,6 @@
 [package]
 name = "kerntex-mcp"
-version = "0.1.6"
+version = "0.1.7"
 description = "Connects AI agents (MCP clients) to the running KernTeX app"
 authors = ["Nicolas Sauer"]
 license = "MIT"
