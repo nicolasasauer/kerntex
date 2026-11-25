@@ -9,7 +9,9 @@ use crate::core::project::{self, FileNode, ProjectInfo, BUILD_DIR};
 use crate::core::refs::{self, ProjectRefs};
 use crate::core::settings::{self, ProjectSettings};
 use crate::core::templates::{self, Template};
+use crate::mcp::{self, Hub};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 #[derive(Default)]
@@ -190,9 +192,16 @@ pub async fn export_pdf(root: String, main_file: String, dest: String) -> Result
 }
 
 #[tauri::command]
-pub async fn compile(app: AppHandle, state: State<'_, AppState>, request: CompileRequest) -> Result<CompileResult> {
+pub async fn compile(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    hub: State<'_, Arc<Hub>>,
+    request: CompileRequest,
+) -> Result<CompileResult> {
     let cancel = state.compile.clone();
-    blocking(move || {
+    let hub = hub.inner().clone();
+    let progress_hub = hub.clone();
+    let result = blocking(move || {
         // Only one build at a time: stop a running one and wait for it to wind down.
         if cancel.cancel() {
             let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -201,10 +210,14 @@ pub async fn compile(app: AppHandle, state: State<'_, AppState>, request: Compil
             }
         }
         compile::compile(&request, &cancel, |p| {
+            progress_hub.compile_progress(&p);
             let _ = app.emit("compile://progress", p);
         })
     })
-    .await
+    .await;
+    // Agents read the outcome through the MCP tools `compile` / `get_diagnostics`.
+    hub.record_compile(&result);
+    result
 }
 
 #[tauri::command]
@@ -279,4 +292,100 @@ pub async fn git_set_identity(root: String, name: String, email: String) -> Resu
 #[tauri::command]
 pub async fn git_abort_merge(root: String) -> Result<()> {
     blocking(move || git::abort_merge(Path::new(&root))).await
+}
+
+// ---------- MCP server (see crate::mcp) ----------
+
+/// Delivers the MCP hub's requests to the web UI as events.
+pub struct TauriFrontend(pub AppHandle);
+
+impl mcp::Frontend for TauriFrontend {
+    fn emit(&self, event: &str, payload: serde_json::Value) {
+        let _ = self.0.emit(event, payload);
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpConfig {
+    pub enabled: bool,
+    pub allow_edits: bool,
+    pub root: Option<String>,
+    pub name: Option<String>,
+    pub main_file: Option<String>,
+}
+
+/// The UI reports what the user allows and which project is open.
+#[tauri::command]
+pub fn mcp_configure(hub: State<'_, Arc<Hub>>, config: McpConfig) {
+    let project = config.root.map(|root| mcp::Project {
+        root: PathBuf::from(root),
+        name: config.name.unwrap_or_default(),
+        main_file: config.main_file,
+    });
+    hub.configure(mcp::Config { enabled: config.enabled, allow_edits: config.allow_edits, project });
+}
+
+/// The UI's answer to an `mcp://request` event.
+#[tauri::command]
+pub fn mcp_respond(hub: State<'_, Arc<Hub>>, id: u64, ok: bool, value: Option<serde_json::Value>, error: Option<String>) {
+    hub.respond(
+        id,
+        if ok { Ok(value.unwrap_or(serde_json::Value::Null)) } else { Err(error.unwrap_or_else(|| "KernTeX couldn't do that.".into())) },
+    );
+}
+
+#[tauri::command]
+pub fn mcp_clients(hub: State<'_, Arc<Hub>>) -> Vec<mcp::ClientInfo> {
+    hub.clients()
+}
+
+#[tauri::command]
+pub fn mcp_disconnect(hub: State<'_, Arc<Hub>>) {
+    hub.disconnect_all();
+}
+
+/// The `kerntex-mcp` command to give to AI assistants.
+#[tauri::command]
+pub async fn mcp_setup(app: AppHandle) -> mcp::setup::McpSetup {
+    let data = app.path().app_local_data_dir().ok();
+    tauri::async_runtime::spawn_blocking(move || mcp::setup::setup(data.as_deref())).await.unwrap_or_else(|e| mcp::setup::McpSetup {
+        command: None,
+        problem: Some(e.to_string()),
+        endpoint: String::new(),
+        claude_code: None,
+    })
+}
+
+/// Opens Cursor's or VS Code's "add MCP server" dialog for `kerntex-mcp`.
+#[tauri::command]
+pub async fn mcp_install_link(app: AppHandle, target: String) -> Result<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let data = app.path().app_local_data_dir().ok();
+    let setup = tauri::async_runtime::spawn_blocking(move || mcp::setup::setup(data.as_deref()))
+        .await
+        .map_err(|e| AppError::new(ErrorSource::App, "Internal task failed").detail(e.to_string()))?;
+    let command =
+        setup.command.ok_or_else(|| AppError::new(ErrorSource::App, "kerntex-mcp wasn't found").hint(setup.problem.unwrap_or_default()))?;
+    let link = mcp::setup::install_link(&target, &command)
+        .ok_or_else(|| AppError::new(ErrorSource::App, "Unknown AI assistant").detail(target.clone()))?;
+    app.opener().open_url(link, None::<&str>).map_err(|e| {
+        AppError::new(ErrorSource::App, "The link didn't open")
+            .detail(e.to_string())
+            .hint("Is the app installed? Otherwise copy the configuration and add it in the app's MCP settings.")
+    })
+}
+
+/// Runs `claude mcp add --scope user kerntex -- <kerntex-mcp>`.
+#[tauri::command]
+pub async fn mcp_add_to_claude_code(app: AppHandle) -> Result<String> {
+    let data = app.path().app_local_data_dir().ok();
+    blocking(move || {
+        let setup = mcp::setup::setup(data.as_deref());
+        let command = setup
+            .command
+            .ok_or_else(|| AppError::new(ErrorSource::App, "kerntex-mcp wasn't found").hint(setup.problem.unwrap_or_default()))?;
+        mcp::setup::add_to_claude_code(&command).map_err(|e| AppError::new(ErrorSource::App, "Couldn't connect Claude Code").detail(e))
+    })
+    .await
 }

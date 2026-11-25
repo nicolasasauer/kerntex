@@ -118,6 +118,9 @@ export interface CiteRef {
   key: string;
   kind: string;
   title: string | null;
+  /** Family names; a trailing "others" stays as it is. */
+  authors: string[];
+  year: string | null;
   file: string;
 }
 
@@ -171,4 +174,38 @@ export interface PullResult {
 export interface GitProgress {
   op: "pull" | "push";
   line: string;
+}
+
+// --- MCP server (src-tauri/src/mcp) ---
+
+export interface McpClient {
+  id: number;
+  name: string;
+}
+
+export interface McpSetup {
+  /** Absolute path of the `kerntex-mcp` command, if found. */
+  command: string | null;
+  /** Why `command` is missing, in plain language. */
+  problem: string | null;
+  endpoint: string;
+  /** The Claude Code CLI, if installed. */
+  claudeCode: string | null;
+}
+
+/** A request from the MCP server that needs the editor. */
+export interface McpRequest {
+  id: number;
+  op: "read" | "apply" | "buffers" | "created" | "compile";
+  args: Record<string, unknown>;
+}
+
+export interface McpActivity {
+  client: string;
+  tool: string;
+  detail: string;
+  ok: boolean;
+  error: string | null;
+  /** Added by the UI. */
+  at?: number;
 }

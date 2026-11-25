@@ -8,7 +8,7 @@ import articleTex from "../../../src-tauri/templates/article.tex?raw";
 import samplePdfUrl from "./sample.pdf?url";
 import exampleImageUrl from "../../../src-tauri/templates/welcome/images/example.png?url";
 import sampleDetails from "./details.json";
-import type { BuildDetails, CompileRequest, CompileResult, Diagnostic, FileNode, ProjectInfo } from "../types";
+import type { BuildDetails, CiteRef, CompileRequest, CompileResult, Diagnostic, FileNode, ProjectInfo } from "../types";
 
 const emptyDetails: BuildDetails = { program: null, format: null, documentClass: null, packages: [], passes: 0, enginePath: null, outDir: null, logPath: null };
 
@@ -160,10 +160,15 @@ async function handle(cmd: string, a: Record<string, any>): Promise<unknown> {
       return (await fetch(a.path.endsWith(".pdf") ? samplePdfUrl : exampleImageUrl)).arrayBuffer();
     case "scan_refs": {
       const labels: { name: string; file: string; line: number }[] = [];
-      const citations: { key: string; kind: string; title: string | null; file: string }[] = [];
+      const citations: CiteRef[] = [];
       for (const [f, t] of files) {
         if (f.endsWith(".tex")) t.split("\n").forEach((l, i) => { for (const m of l.matchAll(/\\label\{([^}]+)\}/g)) labels.push({ name: m[1], file: f, line: i + 1 }); });
-        if (f.endsWith(".bib")) for (const m of t.matchAll(/@(\w+)\{([^,]+),[\s\S]*?title\s*=\s*\{(.+?)\},/g)) citations.push({ kind: m[1].toLowerCase(), key: m[2].trim(), title: m[3].replace(/[{}]/g, ""), file: f });
+        // Rough stand-in for the Rust parser (core/refs.rs).
+        if (f.endsWith(".bib")) for (const m of t.matchAll(/@(\w+)\{([^,]+),([\s\S]*?)(?=\n@|$)/g)) {
+          const field = (name: string) => m[3].match(new RegExp(`\\b${name}\\s*=\\s*\\{(.+?)\\},?\\s*\\n`))?.[1].replace(/[{}]/g, "") ?? null;
+          const authors = field("author")?.split(" and ").map((n) => (n.includes(",") ? n.split(",")[0] : n.split(" ").pop()!)) ?? [];
+          citations.push({ kind: m[1].toLowerCase(), key: m[2].trim(), title: field("title"), authors, year: field("year"), file: f });
+        }
       }
       return { labels, citations };
     }
@@ -183,10 +188,38 @@ async function handle(cmd: string, a: Record<string, any>): Promise<unknown> {
     case "cancel_compile":
       cancelFlag = true;
       return true;
+    // MCP: `?demo=agent` pretends Claude Code is connected (for UI work and screenshots).
+    case "mcp_configure":
+    case "mcp_respond":
+    case "mcp_install_link":
+      return null;
+    case "mcp_clients":
+      return mockAgent ? [{ id: 1, name: "Claude Code" }] : [];
+    case "mcp_disconnect":
+      mockAgent = false;
+      emit("mcp://clients", []);
+      return null;
+    case "mcp_setup":
+      return { command: "/opt/kerntex/kerntex-mcp", problem: null, endpoint: "/run/user/1000/kerntex-mcp.sock", claudeCode: "/home/demo/.local/bin/claude" };
+    case "mcp_add_to_claude_code":
+      return "Added stdio MCP server kerntex";
     default:
       if (cmd.startsWith("git_")) return gitMock(cmd, a);
   }
   throw { source: "app", title: `Unknown command ${cmd}`, detail: null, hint: null };
+}
+
+let mockAgent = typeof location !== "undefined" && new URLSearchParams(location.search).get("demo") === "agent";
+if (mockAgent) {
+  setTimeout(() => {
+    const steps = [
+      { tool: "list_files", detail: "" },
+      { tool: "read_file", detail: "main.tex" },
+      { tool: "edit_file", detail: "main.tex (2 changes)" },
+      { tool: "compile", detail: "0 errors, 1 warning" },
+    ];
+    steps.forEach((a, i) => setTimeout(() => emit("mcp://activity", { client: "Claude Code", ok: true, error: null, ...a }), i * 150));
+  }, 1500);
 }
 
 export async function listen(event: string, cb: (p: unknown) => void) {

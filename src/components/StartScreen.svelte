@@ -5,6 +5,8 @@
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import X from "@lucide/svelte/icons/x";
   import Folder from "@lucide/svelte/icons/folder";
+  import Bot from "@lucide/svelte/icons/bot";
+  import { mcp } from "../lib/mcp.svelte";
   import { ws } from "../lib/workspace.svelte";
   import { settings, removeRecent } from "../lib/settings.svelte";
   import { ui, fmt } from "../lib/commands.svelte";
@@ -78,6 +80,11 @@
     </section>
 
     <p class="hint muted">Tip: drop a project folder or an Overleaf ZIP anywhere on this window. Press <kbd>{fmt("Mod+K")}</kbd> for all commands.</p>
+    <p class="hint ai muted">
+      <Bot size={14} />
+      <span>Working with an AI assistant? Let Claude, Cursor or VS Code read, edit and compile your document —
+        <button class="link" onclick={() => (mcp.dialog = true)}>connect one</button>.</span>
+    </p>
 
     <footer class="foot muted">
       <span>KernTeX {APP_VERSION}</span>
@@ -263,6 +270,23 @@
   .hint {
     margin-top: 24px;
     font-size: 12px;
+  }
+  .hint.ai {
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .link {
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--accent);
+    cursor: pointer;
+    font: inherit;
+  }
+  .link:hover {
+    text-decoration: underline;
   }
   @media (max-width: 640px) {
     .actions {

@@ -300,8 +300,12 @@ class Workspace {
     if (!this.tabs.some((t) => t.path === path)) {
       try {
         const text = await api.readFile(p.root, path);
-        this.tabs.push({ path, kind: "text", saved: text, dirty: false });
-        this.editor?.open(path, text);
+        // Opened meanwhile (e.g. by an AI assistant's edit): just switch to it.
+        if (this.tabs.some((t) => t.path === path)) this.editor?.open(path, "");
+        else {
+          this.tabs.push({ path, kind: "text", saved: text, dirty: false });
+          this.editor?.open(path, text);
+        }
       } catch (e) {
         toastError(toAppError(e));
         return;
@@ -527,18 +531,25 @@ class Workspace {
     this.editor?.insertAtCursor(this.figureSnippet(file));
   }
 
+  /** Opens `path` as a tab without switching to it (for edits the user didn't make by typing). */
+  async openInBackground(path: string) {
+    const p = this.project;
+    if (!p || this.tabs.some((t) => t.path === path)) return;
+    const text = await api.readFile(p.root, path);
+    if (this.tabs.some((t) => t.path === path)) return;
+    this.tabs.push({ path, kind: "text", saved: text, dirty: false });
+    const cur = this.active;
+    this.editor?.open(path, text);
+    if (cur && cur !== path && this.tabs.find((t) => t.path === cur)?.kind === "text") this.editor?.open(cur, "");
+    else if (!cur) this.active = path;
+  }
+
   /** Quick fix: add \usepackage{pkg} to the main file's preamble. */
   async addPackage(pkg: string) {
     const main = this.mainFile;
     const p = this.project;
     if (!main || !p) return;
-    if (!this.tabs.some((t) => t.path === main)) {
-      const text = await api.readFile(p.root, main);
-      this.tabs.push({ path: main, kind: "text", saved: text, dirty: false });
-      const cur = this.active;
-      this.editor?.open(main, text);
-      if (cur) this.editor?.open(cur, "");
-    }
+    await this.openInBackground(main);
     const text = this.editor?.text(main) ?? "";
     const pos = usepackageInsertPos(text);
     this.editor?.insertAt(main, pos, `${pos > 0 ? "\n" : ""}\\usepackage{${pkg}}`);
@@ -555,24 +566,25 @@ class Workspace {
 
   // ---------- Compile ----------
 
-  async compile() {
+  /** Saves all files and compiles the main file. Resolves with the result (null if nothing ran). */
+  async compile(): Promise<CompileResult | null> {
     const p = this.project;
     const main = this.mainFile;
-    if (!p) return;
+    if (!p) return null;
     if (!main) {
       toast({ kind: "warning", source: "KernTeX", title: "No main file", body: "Right-click your root .tex file in the file tree → “Set as main file”." });
-      return;
+      return null;
     }
     if (this.status.state === "running") {
       this.#pendingCompile = true;
-      return;
+      return null;
     }
     await this.saveAll();
     const firstRun = this.engine === "tectonic" && this.engines != null && !this.engines.tectonicCacheReady;
     this.status = { state: "running", stage: "Starting", detail: null, startedAt: performance.now(), firstRun };
     try {
       const result = await api.compile({ root: p.root, mainFile: main, engine: this.engine, flavor: this.flavor });
-      if (this.project !== p) return;
+      if (this.project !== p) return null;
       this.status = { state: "done", result };
       this.log = result.log;
       if (!result.canceled) {
@@ -586,12 +598,14 @@ class Workspace {
       }
       this.editor?.refreshLint();
       this.refreshTree();
+      return result;
     } catch (e) {
       const err = toAppError(e);
       this.status = { state: "idle" };
       this.diagnostics = [{ severity: "error", source: err.source === "engine" ? "TeX engine" : "KernTeX", file: null, line: null, message: err.title + (err.detail ? ` (${err.detail})` : ""), hint: err.hint }];
       settings.layout.problemsOpen = true;
       toastError(err);
+      return null;
     } finally {
       if (this.#pendingCompile) {
         this.#pendingCompile = false;

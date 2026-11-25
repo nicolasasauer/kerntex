@@ -1,14 +1,23 @@
 //! KernTeX desktop app. Domain logic lives in [`core`] (Tauri-free);
-//! [`commands`] exposes it to the web UI.
+//! [`commands`] exposes it to the web UI and [`mcp`] to AI agents.
 
 pub mod commands;
 pub mod core;
+pub mod mcp;
+
+use tauri::Manager;
 
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(commands::AppState::default())
+        .setup(|app| {
+            let hub = mcp::Hub::new(commands::TauriFrontend(app.handle().clone()));
+            app.manage(hub.clone());
+            tauri::async_runtime::spawn(hub.listen());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::detect_engines,
             commands::open_project,
@@ -45,6 +54,13 @@ pub fn run() {
             commands::git_set_remote,
             commands::git_set_identity,
             commands::git_abort_merge,
+            commands::mcp_configure,
+            commands::mcp_respond,
+            commands::mcp_clients,
+            commands::mcp_disconnect,
+            commands::mcp_setup,
+            commands::mcp_install_link,
+            commands::mcp_add_to_claude_code,
         ])
         .run(tauri::generate_context!())
         .expect("error while running KernTeX");

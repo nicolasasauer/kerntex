@@ -46,7 +46,7 @@ Atomic saves (temp file + rename), autosave, deleting only to the system trash, 
 
 ## Architecture rules
 
-- `src-tauri/src/core/` imports nothing from `tauri`. Tauri commands in `commands.rs` are thin wrappers, so a CLI or the MCP server can reuse the core.
+- `src-tauri/src/core/` imports nothing from `tauri`. Tauri commands in `commands.rs` are thin wrappers, so a CLI or the MCP server (`src-tauri/src/mcp`) can reuse the core.
 - Paths between UI and backend are project-relative with `/`. Only `project::resolve` turns them into absolute paths, and it refuses `..` and absolute paths.
 - All file I/O goes through `core::project`, so a sync layer can be inserted later.
 - Binary data (the PDF) is sent with `tauri::ipc::Response`, never as a JSON array.

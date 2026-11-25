@@ -24,6 +24,10 @@ const defaults = {
   pdfZoom: "fit-width" as "fit-width" | "fit-page" | number,
   recent: [] as RecentProject[],
   welcomed: false,
+  /** MCP server: AI agents may work on the open project. Off until the user turns it on. */
+  mcpEnabled: false,
+  /** When off, agents may read and compile but not change files. */
+  mcpAllowEdits: true,
   layout: { tree: 240, pdf: 0.45, problems: 200, treeOpen: true, pdfOpen: true, problemsOpen: false, side: "files" as "files" | "git" },
 };
 

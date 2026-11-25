@@ -1,6 +1,6 @@
 # MCP server: research and implementation plan (November 2026)
 
-Research notes for the planned MCP server ([docs/mcp.md](mcp.md), roadmap v0.3), collected on 2026-11-25. They record the current state of the protocol and tooling and the design we intend to follow. `docs/mcp.md` will be updated from this once the design is agreed.
+Research notes for the MCP server, collected on 2026-11-25. They record the state of the protocol and tooling and the design decisions. **Implemented** — see [docs/mcp.md](mcp.md) for what was built; this file stays as the background.
 
 ## Starting point
 
