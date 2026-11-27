@@ -7,7 +7,6 @@ What KernTeX doesn't do yet, roughly in order of how much it would help. The arc
 | Item | Why it matters | Planned |
 | --- | --- | --- |
 | **SyncTeX** — double-click in the PDF jumps to the source line, Ctrl+click in the source jumps to the PDF | One of the most-used features in Overleaf; finding a spot in a long document is tedious without it. The engine already writes `.synctex.gz`. | v0.2 |
-| **File watcher** — notice files changed outside KernTeX (Git pull, another editor, sync tools) | Today the editor keeps showing the old text until the file is reopened; saving could then overwrite the external change. | v0.2 |
 | **Spell checking** (German / English) | Expected by anyone writing prose; e.g. LTeX / LanguageTool, optional. | v0.2 |
 | **Download progress on the very first compile** | The first Tectonic run shows which package is being downloaded, but no overall progress (%). | open |
 | **Native menu bar** (File / Edit / View) | Some users (especially on macOS) look there first; today there is a File button in the toolbar, plus the command palette and context menus. | open |
@@ -17,7 +16,7 @@ What KernTeX doesn't do yet, roughly in order of how much it would help. The arc
 
 All tracked as [GitHub issues](https://github.com/nicolasasauer/kerntex/issues), labelled by version.
 
-- **v0.2** — SyncTeX, file watcher, spell checking
+- **v0.2** — SyncTeX, spell checking (file watcher done)
 - **v0.3** — Git panel (#13; first step done, see below). Next: sign-in prompt for tokens (`GIT_ASKPASS`, #33), clone from URL, "Sign in with GitHub" / "Publish to GitHub"; later optional local-LLM commit messages (#26). The MCP server for AI assistants is done: [docs/mcp.md](mcp.md)
 - **v0.4** — device sync and real-time collaboration via a self-hostable server (`kerntex-sync`)
 - **Microsoft Store** — MSIX package is built by the release workflow; see [docs/microsoft-store.md](microsoft-store.md)
@@ -27,6 +26,7 @@ All tracked as [GitHub issues](https://github.com/nicolasasauer/kerntex/issues),
 
 ## Done since v0.1 planning
 
+- **File watcher** (#10): files changed outside KernTeX (Git, another editor, sync tools) show up by themselves: the tree updates, open files without unsaved edits reload in place (cursor and scroll stay). With unsaved edits, KernTeX asks: keep mine, load the file on disk, or compare. Saves also check that the file on disk is still the one that was loaded, so nothing is overwritten silently.
 - **Calmer auto-compile** (#4): autosave compiles only while builds take under 5 s; longer documents compile on `Ctrl+S` or *Compile*. Setting *Compile on autosave*: only for quick documents / always / never.
 - **Missing packages point at `\usepackage`** (#5): the error jumps to the package name in the `\usepackage` / `\documentclass` line, not the line after it.
 - **Git panel, step 1** (#13): *Git* tab in the sidebar with branch, ahead/behind, changed files with a diff view, rule-based commit message suggestion (names the changed `\section`s), *Commit & Push* (commit → pull → push) and *Commit*, pull, set up Git for a project (with `.gitignore` for `.kerntex/out/`), add a remote URL, set name/email, merge conflicts listed with *Abort merge*. Uses the system `git`; pull/push show progress and can be cancelled.

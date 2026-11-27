@@ -14,3 +14,4 @@ pub mod refs;
 pub mod settings;
 pub mod templates;
 pub mod typst_engine;
+pub mod watch;

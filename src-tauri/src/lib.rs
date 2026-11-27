@@ -25,6 +25,7 @@ pub fn run() {
             commands::project_exists,
             commands::read_file,
             commands::write_file,
+            commands::watch_project,
             commands::create_file,
             commands::create_dir,
             commands::rename_path,

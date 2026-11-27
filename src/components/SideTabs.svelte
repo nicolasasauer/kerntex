@@ -5,6 +5,8 @@
   import { fmt } from "../lib/commands.svelte";
 
   const L = settings.layout;
+  /** Tab names only when the sidebar has room next to the panel's buttons; otherwise icons with tooltips. */
+  const labels = $derived(L.tree >= 290);
 
   // Push / pull in progress: dots flow along the branch (up = out, down = in).
   const flow = $derived(git.op?.direction ?? null);
@@ -26,11 +28,11 @@
 </script>
 
 <div class="tabs" role="tablist" aria-label="Sidebar">
-  <button role="tab" class="tab" class:active={L.side === "files"} aria-selected={L.side === "files"} title="Files ({fmt('Mod+B')} toggles the sidebar)" onclick={() => (L.side = "files")}>
+  <button role="tab" class="tab" class:active={L.side === "files"} aria-selected={L.side === "files"} title="Files ({fmt('Mod+B')} toggles the sidebar)" aria-label={labels ? undefined : "Files"} onclick={() => (L.side = "files")}>
     <Files size={14} aria-hidden="true" />
-    Files
+    {#if labels}Files{/if}
   </button>
-  <button role="tab" class="tab" class:active={L.side === "git"} aria-selected={L.side === "git"} title="Git: commit, push, pull ({fmt('Mod+Shift+G')})" onclick={() => (L.side = "git")}>
+  <button role="tab" class="tab" class:active={L.side === "git"} aria-selected={L.side === "git"} title="Git: commit, push, pull ({fmt('Mod+Shift+G')})" aria-label={labels ? undefined : `Git${git.changeCount > 0 ? `, ${git.changeCount} changes` : ""}`} onclick={() => (L.side = "git")}>
     {#key pop}
       <!-- Lucide's git-branch, inline so the tip and the branch line can be animated. -->
       <svg class="branch" class:pop={pop > 0} class:flow={flow} class:pull={flow === "pull"} viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -39,7 +41,7 @@
         <circle cx="6" cy="18" r="3" />
       </svg>
     {/key}
-    Git
+    {#if labels}Git{/if}
     {#if git.changeCount > 0}
       {#key pop}<span class="badge" class:pop={pop > 0} aria-label="{git.changeCount} changes">{git.changeCount > 99 ? "99+" : git.changeCount}</span>{/key}
     {/if}

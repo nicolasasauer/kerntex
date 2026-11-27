@@ -5,6 +5,7 @@
 import welcomeTex from "../../../src-tauri/templates/welcome/main.tex?raw";
 import welcomeBib from "../../../src-tauri/templates/welcome/references.bib?raw";
 import articleTex from "../../../src-tauri/templates/article.tex?raw";
+import { contentHash } from "../hash";
 import samplePdfUrl from "./sample.pdf?url";
 import exampleImageUrl from "../../../src-tauri/templates/welcome/images/example.png?url";
 import sampleDetails from "./details.json";
@@ -28,6 +29,18 @@ let cancelFlag = false;
 const demoProblems = typeof location !== "undefined" && new URLSearchParams(location.search).get("demo") === "problems";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Dev/test hook: pretend another program (Git, an editor) changed a file.
+// `null` deletes it. Example: __kerntexMock.externalWrite("main.tex", "…")
+if (typeof window !== "undefined") {
+  (window as unknown as { __kerntexMock: unknown }).__kerntexMock = {
+    externalWrite(path: string, text: string | null) {
+      if (text === null) files.delete(path);
+      else files.set(path, text);
+      setTimeout(() => emit("fs://changed", [path]), 300);
+    },
+  };
+}
+
 const err = (title: string, hint?: string) => ({ source: "fileSystem", title, detail: null, hint: hint ?? null });
 
 function tree(): FileNode[] {
@@ -126,7 +139,13 @@ async function handle(cmd: string, a: Record<string, any>): Promise<unknown> {
       if (a.path.endsWith(".png")) throw err(`“${a.path}” isn't a text file`, "KernTeX can only edit UTF-8 text.");
       return files.get(a.path);
     case "write_file":
+      if (a.expected && (!files.has(a.path) || contentHash(files.get(a.path)!) !== a.expected)) {
+        throw { ...err(`“${a.path}” was changed outside KernTeX`, "KernTeX didn't save, so the other change isn't lost. Choose whether to keep your version or load the one on disk."), code: "changedOnDisk" };
+      }
       files.set(a.path, a.content);
+      setTimeout(() => emit("fs://changed", [a.path]), 300); // like the real watcher, which sees own saves too
+      return null;
+    case "watch_project":
       return null;
     case "create_file":
       if (files.has(a.path)) throw err(`Couldn't create “${a.path}”`, "Something with this name already exists. Choose a different name.");

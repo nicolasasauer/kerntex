@@ -4,6 +4,7 @@
 import { api, joinPath, parentDir, pickFiles, pickFolder, pickSavePath, pickZip, confirmDialog, toAppError } from "./api";
 import { settings, addRecent, removeRecent } from "./settings.svelte";
 import { toast, toastError } from "./toasts.svelte";
+import { contentHash } from "./hash";
 import { usepackageInsertPos } from "./latex/packages";
 import type { EditorController } from "./latex/editor";
 import type {
@@ -17,6 +18,12 @@ export interface Tab {
   /** Text as last saved to disk. */
   saved: string;
   dirty: boolean;
+  /**
+   * The file changed on disk (Git, another editor …) while this tab had unsaved
+   * edits: the text on disk, or null if it was deleted. Until the user picks a
+   * side, the tab isn't saved, so neither version is lost.
+   */
+  external?: { text: string | null } | null;
 }
 
 export type CompileStatus =
@@ -68,6 +75,10 @@ class Workspace {
   #toldAutoCompilePaused = false;
   #autosaveTimer: ReturnType<typeof setTimeout> | undefined;
   #unlisten: (() => void) | null = null;
+  #unlistenFs: (() => void) | null = null;
+  #treeTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The file whose external change is being compared (dialog open). */
+  comparing: string | null = $state(null);
 
   get mainFile(): string | null {
     return this.project?.settings.mainFile ?? this.project?.mainFile ?? null;
@@ -91,11 +102,13 @@ class Workspace {
         this.status = { ...this.status, stage: p.stage, detail: p.detail };
       }
     });
+    this.#unlistenFs = await api.onFsChanged((paths) => this.#onFsChanged(paths));
     api.detectEngines().then((e) => (this.engines = e)).catch(() => {});
   }
 
   dispose() {
     this.#unlisten?.();
+    this.#unlistenFs?.();
   }
 
   // ---------- Projects ----------
@@ -107,6 +120,7 @@ class Workspace {
       const info = await api.openProject(root);
       this.closeAllTabs();
       this.project = info;
+      api.watchProject(info.root).catch((e) => toastError(toAppError(e)));
       this.#lastOkBuildMs = this.#lastBuildMs = null;
       this.#toldAutoCompilePaused = false;
       this.diagnostics = [];
@@ -132,6 +146,7 @@ class Workspace {
     if (!(await this.confirmDiscard())) return;
     this.closeAllTabs();
     this.project = null;
+    api.watchProject(null).catch(() => {});
     this.diagnostics = [];
     this.status = { state: "idle" };
   }
@@ -248,37 +263,109 @@ class Workspace {
 
   /** After files changed on disk (Git pull, merge abort): update the tree and open tabs. */
   async reloadFromDisk() {
+    if (!this.project) return;
+    await this.refreshTree();
+    for (const t of this.tabs.filter((t) => t.kind === "text")) await this.#syncTab(t);
+    this.loadRefs();
+  }
+
+  /** The watcher reports files changed on disk (including KernTeX's own saves). */
+  async #onFsChanged(paths: string[]) {
+    if (!this.project) return;
+    // The tree, Git status and labels follow quietly; several batches in a row refresh once.
+    clearTimeout(this.#treeTimer);
+    this.#treeTimer = setTimeout(() => {
+      this.refreshTree();
+      if (paths.some((p) => /\.(tex|bib|typ)$/i.test(p))) this.loadRefs();
+    }, 150);
+    const hit = (tab: string) => paths.some((p) => tab === p || tab.startsWith(p + "/"));
+    for (const t of this.tabs.filter((t) => t.kind === "text" && hit(t.path))) await this.#syncTab(t);
+  }
+
+  /**
+   * Brings an open tab in line with the file on disk. Unchanged (or our own
+   * save): nothing. No unsaved edits: show the new text, keeping cursor and
+   * scroll. Unsaved edits: never overwrite either side, ask (`tab.external`).
+   */
+  async #syncTab(t: Tab) {
     const p = this.project;
     if (!p) return;
-    await this.refreshTree();
-    let reopened = false;
-    for (const t of [...this.tabs]) {
-      if (t.kind !== "text" || t.dirty) continue;
-      let text: string;
-      try {
-        text = await api.readFile(p.root, t.path);
-      } catch {
-        // Gone (deleted by the pull): close the tab without saving it back.
-        this.tabs.splice(this.tabs.indexOf(t), 1);
-        this.editor?.close(t.path);
-        if (this.active === t.path) this.active = null;
-        continue;
+    let disk: string | null;
+    try {
+      disk = await api.readFile(p.root, t.path);
+    } catch {
+      disk = null; // deleted (or no longer readable)
+    }
+    if (!this.tabs.includes(t)) return; // closed meanwhile
+    const mine = this.editor?.text(t.path) ?? t.saved;
+    if (disk === t.saved) {
+      t.external = null; // nothing new, or our own save
+      return;
+    }
+    if (disk !== null && disk === mine) {
+      // The same text arrived from elsewhere: nothing to choose.
+      t.saved = disk;
+      t.dirty = false;
+      t.external = null;
+      return;
+    }
+    if (!t.dirty) {
+      if (disk === null) {
+        this.#dropTab(t);
+        toast({ kind: "info", source: "KernTeX", title: `“${t.path.split("/").pop()}” was deleted outside KernTeX`, body: "Its tab was closed." });
+      } else {
+        t.saved = disk;
+        this.editor?.applyText(t.path, disk);
+        t.external = null;
       }
-      if (text === t.saved) continue;
+      return;
+    }
+    t.external = { text: disk };
+  }
+
+  /** Closes a tab without saving it. */
+  #dropTab(t: Tab) {
+    const i = this.tabs.indexOf(t);
+    if (i < 0) return;
+    this.tabs.splice(i, 1);
+    this.editor?.close(t.path);
+    if (this.active === t.path) {
+      const next = this.tabs[i] ?? this.tabs[i - 1];
+      this.active = null;
+      if (next) this.activate(next.path);
+    }
+  }
+
+  /** Conflict resolved by keeping the editor's text: written over the file on disk. */
+  async keepMine(path: string) {
+    const p = this.project;
+    const t = this.tabs.find((t) => t.path === path);
+    if (!p || !t) return;
+    const text = this.editor?.text(path) ?? t.saved;
+    try {
+      await api.writeFile(p.root, path, text);
       t.saved = text;
-      this.editor?.replaceAll(t.path, text);
-      // Tabs in the background lose their editor state on replaceAll; recreate it.
-      if (this.editor && !this.editor.has(t.path)) {
-        this.editor.open(t.path, text);
-        reopened = true;
-      }
+      t.dirty = false;
+      t.external = null;
+      this.fsVersion++;
+    } catch (e) {
+      toastError(toAppError(e));
     }
-    if (!this.active && this.tabs[0]) this.activate(this.tabs[0].path);
-    else if (reopened) {
-      const show = this.tabs.find((t) => t.path === this.active)?.kind === "text" ? this.active : this.lastTextTab;
-      if (show && this.tabs.some((t) => t.path === show)) this.editor?.open(show, "");
+  }
+
+  /** Conflict resolved by taking the file on disk; the editor's edits can still be undone back. */
+  loadTheirs(path: string) {
+    const t = this.tabs.find((t) => t.path === path);
+    if (!t?.external) return;
+    const disk = t.external.text;
+    t.external = null;
+    if (disk === null) {
+      this.#dropTab(t);
+      return;
     }
-    this.loadRefs();
+    t.saved = disk;
+    this.editor?.applyText(path, disk);
+    t.dirty = false;
   }
 
   async loadRefs() {
@@ -338,8 +425,10 @@ class Workspace {
   async closeTab(path: string) {
     const tab = this.tabs.find((t) => t.path === path);
     if (!tab) return;
-    if (tab.kind === "text" && tab.dirty) {
-      await this.saveFile(path);
+    if (tab.kind === "text" && tab.dirty && !(await this.saveFile(path))) {
+      // Not saved (e.g. changed on disk meanwhile): keep the tab so nothing is lost.
+      this.activate(path);
+      return;
     }
     const i = this.tabs.indexOf(tab);
     this.tabs.splice(i, 1);
@@ -387,7 +476,7 @@ class Workspace {
     return false;
   }
 
-  async saveFile(path: string): Promise<boolean> {
+  async saveFile(path: string, retry = true): Promise<boolean> {
     const p = this.project;
     const tab = this.tabs.find((t) => t.path === path);
     if (!p || !tab || tab.kind !== "text") return true;
@@ -396,14 +485,26 @@ class Workspace {
       tab.dirty = false;
       return true;
     }
+    // Waiting for the user to choose between their edits and the file on disk.
+    if (tab.external) return false;
     try {
-      await api.writeFile(p.root, path, text);
+      await api.writeFile(p.root, path, text, contentHash(tab.saved));
       this.fsVersion++;
       tab.saved = text;
       tab.dirty = this.editor?.text(path) !== text;
       return true;
     } catch (e) {
-      toastError(toAppError(e));
+      const err = toAppError(e);
+      if (err.code === "changedOnDisk") {
+        // The watcher hasn't told us yet (or can't): ask now instead of overwriting.
+        await this.#syncTab(tab);
+        if (!tab.external) return retry ? this.saveFile(path, false) : false;
+        if (this.active !== path) {
+          toast({ kind: "warning", source: "KernTeX", title: err.title, body: "Not saved, so nothing is lost. Open the tab to choose which version to keep.", action: { label: "Show", run: () => this.activate(path) } });
+        }
+        return false;
+      }
+      toastError(err);
       return false;
     }
   }

@@ -54,7 +54,11 @@ export const api = {
   readTree: (root: string) => call<FileNode[]>("read_tree", { root }),
   projectExists: (root: string) => call<boolean>("project_exists", { root }),
   readFile: (root: string, path: string) => call<string>("read_file", { root, path }),
-  writeFile: (root: string, path: string, content: string) => call<void>("write_file", { root, path, content }),
+  /** `expected`: content hash of the loaded version; the save is refused (code "changedOnDisk") if the file changed since. */
+  writeFile: (root: string, path: string, content: string, expected: string | null = null) => call<void>("write_file", { root, path, content, expected }),
+  /** Watches the project for changes made outside KernTeX (`null` stops). */
+  watchProject: (root: string | null) => call<void>("watch_project", { root }),
+  onFsChanged: async (cb: (paths: string[]) => void) => (await load()).listen("fs://changed", (p) => cb(p as string[])),
   createFile: (root: string, path: string) => call<void>("create_file", { root, path }),
   createDir: (root: string, path: string) => call<void>("create_dir", { root, path }),
   renamePath: (root: string, from: string, to: string) => call<void>("rename_path", { root, from, to }),

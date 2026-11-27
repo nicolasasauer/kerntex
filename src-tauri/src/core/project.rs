@@ -277,6 +277,39 @@ pub fn write_text(root: &Path, rel: &str, content: &str) -> Result<()> {
     })
 }
 
+/// Short fingerprint of a file's content: FNV-1a (32 bit) over its bytes, as
+/// 8 hex digits. The UI computes the same over the UTF-8 text it loaded
+/// (`src/lib/hash.ts`), so a save can tell whether the file still is what the
+/// editor started from.
+pub fn content_hash(bytes: &[u8]) -> String {
+    let mut h: u32 = 0x811c_9dc5;
+    for &b in bytes {
+        h ^= b as u32;
+        h = h.wrapping_mul(0x0100_0193);
+    }
+    format!("{h:08x}")
+}
+
+/// Like [`write_text`], but refuses to overwrite a file that changed on disk
+/// since it was loaded: `expected` is the [`content_hash`] of the loaded
+/// version. Without `expected` (new files), it writes unconditionally.
+pub fn write_text_checked(root: &Path, rel: &str, content: &str, expected: Option<&str>) -> Result<()> {
+    if let Some(expected) = expected {
+        let abs = resolve(root, rel)?;
+        let changed = match fs::read(&abs) {
+            Ok(bytes) => content_hash(&bytes) != expected,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => true,
+            Err(e) => return Err(AppError::io("check", &abs, e)),
+        };
+        if changed {
+            return Err(AppError::new(ErrorSource::FileSystem, format!("“{rel}” was changed outside KernTeX"))
+                .hint("KernTeX didn't save, so the other change isn't lost. Choose whether to keep your version or load the one on disk.")
+                .code("changedOnDisk"));
+        }
+    }
+    write_text(root, rel, content)
+}
+
 pub fn create_file(root: &Path, rel: &str) -> Result<()> {
     let abs = resolve(root, rel)?;
     if abs.exists() {
@@ -388,6 +421,41 @@ mod tests {
     }
     fn rand_suffix() -> u128 {
         std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+    }
+
+    #[test]
+    fn content_hash_is_fnv1a_32() {
+        // Reference values of FNV-1a 32; src/lib/hash.ts must give the same.
+        assert_eq!(content_hash(b""), "811c9dc5");
+        assert_eq!(content_hash(b"a"), "e40c292c");
+        assert_eq!(content_hash("Grüße".as_bytes()), content_hash("Grüße".as_bytes()));
+    }
+
+    #[test]
+    fn checked_write_refuses_external_changes() {
+        let root = tmp();
+        write_text(&root, "main.tex", "loaded").unwrap();
+        let loaded = content_hash(b"loaded");
+
+        // Unchanged on disk: saves.
+        write_text_checked(&root, "main.tex", "mine 1", Some(&loaded)).unwrap();
+        let after_save = content_hash(b"mine 1");
+
+        // Changed by another program: refuses and keeps theirs.
+        fs::write(root.join("main.tex"), "theirs").unwrap();
+        let err = write_text_checked(&root, "main.tex", "mine 2", Some(&after_save)).unwrap_err();
+        assert_eq!(err.code, Some("changedOnDisk"));
+        assert_eq!(fs::read_to_string(root.join("main.tex")).unwrap(), "theirs");
+
+        // Deleted by another program: refuses too, nothing is recreated.
+        fs::remove_file(root.join("main.tex")).unwrap();
+        assert_eq!(write_text_checked(&root, "main.tex", "mine 3", Some(&after_save)).unwrap_err().code, Some("changedOnDisk"));
+        assert!(!root.join("main.tex").exists());
+
+        // Without an expectation (new file, or "keep mine"): writes.
+        write_text_checked(&root, "main.tex", "mine 4", None).unwrap();
+        assert_eq!(fs::read_to_string(root.join("main.tex")).unwrap(), "mine 4");
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]

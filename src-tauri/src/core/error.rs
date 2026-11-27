@@ -28,13 +28,16 @@ pub struct AppError {
     pub title: String,
     pub detail: Option<String>,
     pub hint: Option<String>,
+    /// Machine-readable reason the UI reacts to, e.g. `changedOnDisk`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<&'static str>,
 }
 
 pub type Result<T> = std::result::Result<T, AppError>;
 
 impl AppError {
     pub fn new(source: ErrorSource, title: impl Into<String>) -> Self {
-        Self { source, title: title.into(), detail: None, hint: None }
+        Self { source, title: title.into(), detail: None, hint: None, code: None }
     }
 
     pub fn detail(mut self, detail: impl Into<String>) -> Self {
@@ -44,6 +47,11 @@ impl AppError {
 
     pub fn hint(mut self, hint: impl Into<String>) -> Self {
         self.hint = Some(hint.into());
+        self
+    }
+
+    pub fn code(mut self, code: &'static str) -> Self {
+        self.code = Some(code);
         self
     }
 

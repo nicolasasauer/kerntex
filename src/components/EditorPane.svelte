@@ -8,6 +8,8 @@
   import { fmt } from "../lib/commands.svelte";
   import FilePreview from "./FilePreview.svelte";
   import Image from "@lucide/svelte/icons/image";
+  import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
+  import ExternalChange from "./ExternalChange.svelte";
 
   let host: HTMLDivElement | undefined = $state();
   const activeTab = $derived(ws.tabs.find((t) => t.path === ws.active));
@@ -64,6 +66,21 @@
       </div>
     {/each}
   </div>
+  {#if activeTab?.kind === "text" && activeTab.external}
+    {@const deleted = activeTab.external.text === null}
+    <div class="external" role="alert">
+      <TriangleAlert size={16} />
+      <p>
+        <b>“{name(activeTab.path)}” was {deleted ? "deleted" : "changed"} outside KernTeX</b>
+        <span>(e.g. by Git or another editor) while you had unsaved edits. Nothing is saved until you choose.</span>
+      </p>
+      <div class="actions">
+        {#if !deleted}<button class="btn" onclick={() => (ws.comparing = activeTab.path)}>Compare</button>{/if}
+        <button class="btn" onclick={() => ws.loadTheirs(activeTab.path)}>{deleted ? "Close the tab" : "Load the file on disk"}</button>
+        <button class="btn primary" onclick={() => ws.keepMine(activeTab.path)}>{deleted ? "Save mine again" : "Keep my version"}</button>
+      </div>
+    </div>
+  {/if}
   <div class="host" class:hidden={!ws.active || activeTab?.kind !== "text"} bind:this={host}></div>
   {#if activeTab?.kind === "preview"}
     {#key activeTab.path}<FilePreview path={activeTab.path} />{/key}
@@ -75,8 +92,41 @@
     </div>
   {/if}
 </div>
+{#if ws.comparing}<ExternalChange path={ws.comparing} onClose={() => (ws.comparing = null)} />{/if}
 
 <style>
+  .external {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--warning-soft);
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-size: 12.5px;
+    flex-wrap: wrap;
+  }
+  .external > :global(svg) {
+    color: var(--warning);
+    flex: none;
+  }
+  .external p {
+    margin: 0;
+    flex: 1 1 260px;
+  }
+  .external p span {
+    color: var(--text-muted);
+  }
+  .actions {
+    display: flex;
+    gap: 6px;
+  }
+  .actions .btn {
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
   .pane {
     flex: 1;
     display: flex;

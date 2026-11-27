@@ -7,6 +7,8 @@ export interface AppError {
   title: string;
   detail: string | null;
   hint: string | null;
+  /** Machine-readable reason, e.g. "changedOnDisk" (a save was refused). */
+  code?: string;
 }
 
 export interface FileNode {

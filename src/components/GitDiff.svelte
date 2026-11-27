@@ -1,13 +1,14 @@
 <script lang="ts">
   import FileText from "@lucide/svelte/icons/file-text";
   import Modal from "./Modal.svelte";
+  import DiffTable, { type DiffLine } from "./DiffTable.svelte";
   import { api, toAppError } from "../lib/api";
   import { ws } from "../lib/workspace.svelte";
   import type { AppError, GitChange } from "../lib/types";
 
   let { change, onClose }: { change: GitChange; onClose: () => void } = $props();
 
-  type Line = { kind: "add" | "del" | "ctx" | "hunk"; text: string; old: number | null; new: number | null };
+  type Line = DiffLine;
 
   let lines = $state<Line[] | null>(null);
   let binary = $state(false);
@@ -84,21 +85,7 @@
     {:else if lines.length === 0}
       <p class="msg muted">No text changes (only the file mode or line endings changed).</p>
     {:else}
-      <table>
-        <tbody>
-          {#each lines as l, i (i)}
-            {#if l.kind === "hunk"}
-              <tr class="hunk"><td class="ln"></td><td class="ln"></td><td class="code">{l.text || "⋯"}</td></tr>
-            {:else}
-              <tr class={l.kind}>
-                <td class="ln">{l.old ?? ""}</td>
-                <td class="ln">{l.new ?? ""}</td>
-                <td class="code"><span class="sign">{l.kind === "add" ? "+" : l.kind === "del" ? "−" : " "}</span>{l.text}</td>
-              </tr>
-            {/if}
-          {/each}
-        </tbody>
-      </table>
+      <DiffTable {lines} />
     {/if}
   </div>
 </Modal>
@@ -146,51 +133,5 @@
     padding: 16px 20px;
     font-family: var(--font-ui);
     flex-wrap: wrap;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  td {
-    padding: 0 8px;
-    vertical-align: top;
-    line-height: 1.55;
-  }
-  .ln {
-    width: 1%;
-    min-width: 36px;
-    text-align: right;
-    color: var(--text-faint);
-    user-select: none;
-    white-space: nowrap;
-  }
-  .code {
-    white-space: pre-wrap;
-    word-break: break-word;
-    padding-left: 4px;
-  }
-  .sign {
-    display: inline-block;
-    width: 14px;
-    user-select: none;
-    color: var(--text-faint);
-  }
-  tr.add {
-    background: var(--success-soft);
-  }
-  tr.add .sign {
-    color: var(--success);
-  }
-  tr.del {
-    background: var(--danger-soft);
-  }
-  tr.del .sign {
-    color: var(--danger);
-  }
-  tr.hunk td {
-    background: var(--surface-2);
-    color: var(--text-muted);
-    padding-top: 2px;
-    padding-bottom: 2px;
   }
 </style>

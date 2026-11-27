@@ -9,6 +9,7 @@ use crate::core::project::{self, FileNode, ProjectInfo, BUILD_DIR};
 use crate::core::refs::{self, ProjectRefs};
 use crate::core::settings::{self, ProjectSettings};
 use crate::core::templates::{self, Template};
+use crate::core::watch;
 use crate::mcp::{self, Hub};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -18,6 +19,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 pub struct AppState {
     pub compile: CancelHandle,
     pub git: GitCancel,
+    pub watcher: std::sync::Mutex<Option<watch::ProjectWatcher>>,
 }
 
 /// Runs blocking core work off the main thread.
@@ -61,8 +63,25 @@ pub async fn read_file(root: String, path: String) -> Result<String> {
 }
 
 #[tauri::command]
-pub async fn write_file(root: String, path: String, content: String) -> Result<()> {
-    blocking(move || project::write_text(Path::new(&root), &path, &content)).await
+/// `expected`: content hash of the version the editor loaded; the save is
+/// refused (code `changedOnDisk`) if the file changed on disk since.
+pub async fn write_file(root: String, path: String, content: String, expected: Option<String>) -> Result<()> {
+    blocking(move || project::write_text_checked(Path::new(&root), &path, &content, expected.as_deref())).await
+}
+
+/// Watches the open project for changes made outside KernTeX and emits
+/// `fs://changed` with the changed project-relative paths. Replaces the
+/// previous watcher; `None` stops watching.
+#[tauri::command]
+pub fn watch_project(app: AppHandle, state: State<'_, AppState>, root: Option<String>) -> Result<()> {
+    let mut slot = state.watcher.lock().unwrap_or_else(|e| e.into_inner());
+    *slot = None;
+    if let Some(root) = root {
+        *slot = Some(watch::watch(Path::new(&root), move |paths| {
+            let _ = app.emit("fs://changed", paths);
+        })?);
+    }
+    Ok(())
 }
 
 #[tauri::command]
