@@ -97,6 +97,10 @@ Expected result: **3+ / Everyone**.
 | `4-figures.png` | Preview images and insert a figure with one click |
 | `5-build-details.png` | See the engine and every package your document uses |
 | `6-command-palette.png` | Every action one shortcut away |
+| `7-git.png` | See what changed, then commit and push in one click |
+| `8-ai-assistants.png` | Let Claude, Cursor or VS Code help — edits you see and can undo |
+
+Regenerate them with `npm run screenshots` (see [CONTRIBUTING.md](../CONTRIBUTING.md#screenshots)).
 
 **Store logos** (*Bilder für die Store-Anzeige*): optional, but upload them — otherwise the Store scales up the 50×50 logo from the package. Files in `docs/store/logos/`: `logo-300x300.png` (app tile, shown in the Store on Windows 10/11), `logo-150x150.png`, `logo-71x71.png`. For a larger 1:1 box art use `assets/logo.png` (1024×1024).
 
@@ -152,7 +156,7 @@ Add the language under *Store listings → Manage additional languages → Germa
 12. Vorlagen für Artikel, Abschlussarbeiten, Präsentationen und Briefe
 13. Kostenlos und Open Source, geschrieben in Rust – kein Konto, kein Tracking
 
-**Screenshot-Beschriftungen:** 1 „Dateibaum, Editor und Live-PDF nebeneinander“ · 2 „Dunkler Modus, genauso sorgfältig gestaltet“ · 3 „Fehler mit Lösung – fehlende Pakete per Klick ergänzt“ · 4 „Bilder ansehen und mit einem Klick als Abbildung einfügen“ · 5 „Engine und alle verwendeten Pakete auf einen Blick“ · 6 „Jede Aktion nur ein Tastenkürzel entfernt“
+**Screenshot-Beschriftungen:** 1 „Dateibaum, Editor und Live-PDF nebeneinander“ · 2 „Dunkler Modus, genauso sorgfältig gestaltet“ · 3 „Fehler mit Lösung – fehlende Pakete per Klick ergänzt“ · 4 „Bilder ansehen und mit einem Klick als Abbildung einfügen“ · 5 „Engine und alle verwendeten Pakete auf einen Blick“ · 6 „Jede Aktion nur ein Tastenkürzel entfernt“ · 7 „Änderungen sehen, dann mit einem Klick committen und pushen“ · 8 „Claude, Cursor oder VS Code helfen lassen – Änderungen sichtbar und rückgängig zu machen“
 
 **Suchbegriffe:** `LaTeX`, `TeX`, `LaTeX Editor`, `Overleaf`, `Abschlussarbeit`, `PDF`, `BibTeX`
 

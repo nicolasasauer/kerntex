@@ -46,6 +46,18 @@ Set `KERNTEX_TECTONIC=/path/to/tectonic` to run the Tectonic end-to-end test loc
 - New dependencies only when they clearly save work; justify each one in the PR description.
 - Log-parser changes need a test with a real log excerpt.
 
+## Screenshots
+
+The images in the README (`docs/screenshots/`) and for the Microsoft Store (`docs/store/`, 1920×1080) are taken automatically from the browser mock, so they can be refreshed whenever the UI changes:
+
+```sh
+npm i --no-save playwright && npx playwright install chromium   # once
+npm run screenshots              # all scenes
+npm run screenshots -- git dark  # only some
+```
+
+The scenes are defined in `scripts/screenshots.mjs`. The GitHub workflow *Screenshots* runs the same script (by hand, and after every release) and opens a pull request when the pictures changed.
+
 ## Style
 
 - English in code, comments, commits and docs.

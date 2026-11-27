@@ -64,6 +64,14 @@ No TeX installation needed: KernTeX ships with [Tectonic](https://tectonic-types
     <td><b>Under the hood, on request.</b> Build details show the engine, its version and every package with its version — no log flood.</td>
     <td><b>Everything one shortcut away.</b> <kbd>Ctrl</kbd>+<kbd>K</kbd> finds every action, with its keyboard shortcut.</td>
   </tr>
+  <tr>
+    <td><img src="docs/screenshots/git.png" alt="Git tab with changed files, a suggested commit message and the diff of main.tex"></td>
+    <td><img src="docs/screenshots/ai.png" alt="AI assistants dialog in dark mode with Claude Code connected and its recent actions"></td>
+  </tr>
+  <tr>
+    <td><b>Git built in.</b> See what changed, get a suggested commit message, then <i>Commit &amp; Push</i> in one click.</td>
+    <td><b>Works with AI assistants.</b> Claude Code, Cursor or VS Code can read, edit and compile your project — every edit visible and undoable.</td>
+  </tr>
 </table>
 
 ## Built with

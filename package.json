@@ -14,7 +14,8 @@
     "build:mcp": "node scripts/build-mcp-proxy.mjs",
     "test:scripts": "node --test scripts/fetch-tectonic.test.mjs scripts/build-msix.test.mjs scripts/build-mcp-proxy.test.mjs scripts/version.test.mjs",
     "version:set": "node scripts/version.mjs",
-    "build:msix": "node scripts/build-msix.mjs"
+    "build:msix": "node scripts/build-msix.mjs",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.0",
