@@ -252,7 +252,8 @@ export interface EditorController {
   rename(from: string, to: string): void;
   text(path: string): string | null;
   replaceAll(path: string, text: string): void;
-  gotoLine(line: number): void;
+  /** Moves the cursor to a line; with columns (1-based), selects that range on it. */
+  gotoLine(line: number, column?: number, endColumn?: number): void;
   refreshLint(): void;
   setOptions(o: { fontSize: number; wrap: boolean }): void;
   insertAt(path: string, pos: number, insert: string): void;
@@ -375,10 +376,12 @@ export function createEditor(parent: HTMLElement, host: EditorHost, opts: { font
       view.dispatch({ changes: { from: at, insert }, selection: { anchor: at + insert.length }, scrollIntoView: true });
       view.focus();
     },
-    gotoLine(line) {
+    gotoLine(line, column, endColumn) {
       const doc = view.state.doc;
       const l = doc.line(Math.max(1, Math.min(line, doc.lines)));
-      view.dispatch({ selection: { anchor: l.from }, effects: EditorView.scrollIntoView(l.from, { y: "center" }) });
+      const anchor = column ? Math.min(l.to, l.from + column - 1) : l.from;
+      const head = column && endColumn ? Math.min(l.to, l.from + endColumn - 1) : anchor;
+      view.dispatch({ selection: { anchor, head }, effects: EditorView.scrollIntoView(anchor, { y: "center" }) });
       view.focus();
     },
     refreshLint() {

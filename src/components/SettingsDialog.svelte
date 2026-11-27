@@ -52,6 +52,16 @@
         <label for="as">Autosave <small>Saves shortly after you stop typing</small></label>
         <input id="as" type="checkbox" class="switch" bind:checked={settings.autosave} />
       </div>
+      {#if settings.autosave && settings.compileOnSave}
+        <div class="row">
+          <label for="ac">Compile on autosave <small>Long builds wait for Ctrl+S</small></label>
+          <select id="ac" class="input" bind:value={settings.autoCompile}>
+            <option value="fast">Only for quick documents (under 5 s)</option>
+            <option value="always">Always</option>
+            <option value="off">Never</option>
+          </select>
+        </div>
+      {/if}
       {#if settings.autosave}
         <div class="row">
           <label for="asd">Autosave delay</label>

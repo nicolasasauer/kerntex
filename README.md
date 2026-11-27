@@ -32,7 +32,7 @@ No TeX installation needed: KernTeX ships with [Tectonic](https://tectonic-types
 - **Overleaf-style layout** — file tree, editor with tabs, PDF preview, collapsible problems panel; all panels resizable.
 - **File menu** — new, open, import, recent projects and export in the top left; the logo leads back to the start screen.
 - **Clickable PDF links** — table of contents, references and citations jump to their target; web links open in your browser.
-- **Save = compile** — `Ctrl+S` saves and compiles (can be turned off); optional autosave; compiling shows its live progress (“Typesetting (pass 2)”, “Downloading packages – amsmath.sty”) and can be stopped.
+- **Save = compile** — `Ctrl+S` saves and compiles (can be turned off); autosave compiles too while builds are quick (under 5 s), so long theses don't build on every pause; compiling shows its live progress (“Typesetting (pass 2)”, “Downloading packages – amsmath.sty”) and can be stopped.
 - **Errors you can act on** — every problem says where it came from (LaTeX, a package, BibTeX/Biber, Tectonic, latexmk, the file system), its file and line (click to jump) and how to fix it in plain language. The raw log is one click away.
 - **Missing packages** — the editor notices when you use `\includegraphics`, `\toprule`, `\SI` … without loading the package and offers a one-click fix. Hover `\usepackage{…}` to see what a package does.
 - **Smart completion** — commands, environments, `\ref{` with all labels of the project and `\cite{` with all entries from your `.bib` files, searchable by key, author, year or title.
@@ -63,6 +63,14 @@ No TeX installation needed: KernTeX ships with [Tectonic](https://tectonic-types
   <tr>
     <td><b>Under the hood, on request.</b> Build details show the engine, its version and every package with its version — no log flood.</td>
     <td><b>Everything one shortcut away.</b> <kbd>Ctrl</kbd>+<kbd>K</kbd> finds every action, with its keyboard shortcut.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/git.png" alt="Git tab with changed files, a suggested commit message and the diff of main.tex"></td>
+    <td><img src="docs/screenshots/ai.png" alt="AI assistants dialog in dark mode with Claude Code connected and its recent actions"></td>
+  </tr>
+  <tr>
+    <td><b>Git built in.</b> See what changed, get a suggested commit message, then <i>Commit &amp; Push</i> in one click.</td>
+    <td><b>Works with AI assistants.</b> Claude Code, Cursor or VS Code can read, edit and compile your project — every edit visible and undoable.</td>
   </tr>
 </table>
 

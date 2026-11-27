@@ -93,7 +93,9 @@ async function compile(req: CompileRequest): Promise<CompileResult> {
     diagnostics.push({ severity: "info", source: "hyperref", file: "main.tex", line: 31, message: "Token not allowed in a PDF string (Unicode): removing `\\textsf'", hint: null });
   }
   const ok = !diagnostics.some((d) => d.severity === "error");
-  return { ok, canceled: false, pdfPath: `${ROOT}/.kerntex/out/main.pdf`, diagnostics, durationMs: Math.round(performance.now() - start), log: "This is a mock log.\n(./main.tex\nLaTeX Warning: ...\n)", engineLabel: req.engine === "tectonic" ? "Tectonic" : "latexmk (pdfLaTeX)", details: sampleDetails as BuildDetails };
+  // The simulated time, not the measured one, so screenshots don't vary between runs.
+  const durationMs = stages.reduce((sum, [, , ms]) => sum + ms, 0);
+  return { ok, canceled: false, pdfPath: `${ROOT}/.kerntex/out/main.pdf`, diagnostics, durationMs, log: "This is a mock log.\n(./main.tex\nLaTeX Warning: ...\n)", engineLabel: req.engine === "tectonic" ? "Tectonic" : "latexmk (pdfLaTeX)", details: sampleDetails as BuildDetails };
 }
 
 export async function invoke<T>(cmd: string, args: Record<string, any> = {}): Promise<T> {
@@ -237,7 +239,8 @@ export async function listen(event: string, cb: (p: unknown) => void) {
 
 const gitRepo = { repo: !new URLSearchParams(location.search).has("nogit"), remoteUrl: "https://github.com/demo/welcome-to-kerntex.git" as string | null, ahead: 0, identity: true };
 const committed = new Map(files);
-committed.set("main.tex", welcomeTex.replace("\\section{", "\\section{Old ").replace(/\n[^\n]*\n/, "\n"));
+// The last commit had an older heading and sentence: a small, typical diff.
+committed.set("main.tex", welcomeTex.replace("\\section{Structure}", "\\section{Document structure}").replace("The table of contents above is generated automatically.", "The table of contents is generated."));
 committed.delete("chapters/appendix.tex");
 let lastCommit = { hash: "3f2c1ab", subject: "Add bibliography", time: Math.floor(Date.now() / 1000) - 7200 };
 let gitCancel = false;

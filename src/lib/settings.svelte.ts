@@ -2,6 +2,7 @@
 import type { Engine, TexFlavor } from "./types";
 
 export type ThemePref = "system" | "light" | "dark";
+export type AutoCompile = "always" | "fast" | "off";
 
 export interface RecentProject {
   root: string;
@@ -16,6 +17,8 @@ const defaults = {
   engine: "tectonic" as Engine,
   flavor: "pdflatex" as TexFlavor,
   compileOnSave: true,
+  /** Whether autosave also compiles: always, only while builds are quick, or never. */
+  autoCompile: "fast" as AutoCompile,
   autosave: true,
   autosaveDelayMs: 1500,
   fontSize: 14,

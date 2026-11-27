@@ -48,7 +48,7 @@ export interface Diagnostic {
   source: string;
   file: string | null;
   line: number | null;
-  /** 1-based exact position, where the engine reports it (Typst). */
+  /** 1-based exact position, where known (Typst; LaTeX missing-package errors). */
   column?: number;
   endLine?: number;
   endColumn?: number;

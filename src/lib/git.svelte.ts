@@ -15,6 +15,8 @@ export interface GitOp {
   startedAt: number;
   /** Network operations can be stopped. */
   cancelable: boolean;
+  /** Which way data flows, for the animated Git tab icon. */
+  direction?: "push" | "pull";
 }
 
 class GitState {
@@ -113,8 +115,8 @@ class GitState {
     this.edited = text.trim().length > 0;
   }
 
-  async #run<T>(label: string, cancelable: boolean, f: () => Promise<T>): Promise<T> {
-    this.op = { label, line: null, startedAt: performance.now(), cancelable };
+  async #run<T>(label: string, cancelable: boolean, f: () => Promise<T>, direction?: "push" | "pull"): Promise<T> {
+    this.op = { label, line: null, startedAt: performance.now(), cancelable, direction };
     try {
       return await f();
     } finally {
@@ -176,14 +178,14 @@ class GitState {
   /** Pull (if the branch is already on the remote), then push. False if stopped. */
   async #sync(root: string, pullFirst: boolean): Promise<boolean> {
     if (pullFirst) {
-      const r = await this.#run(`Getting changes from ${this.remoteName}…`, true, () => api.gitPull(root));
+      const r = await this.#run(`Getting changes from ${this.remoteName}…`, true, () => api.gitPull(root), "pull");
       if (r.updated) await this.#afterPull();
       if (r.conflicts.length) {
         this.#conflictToast(r.conflicts);
         return false;
       }
     }
-    await this.#run(`Pushing to ${this.remoteName}…`, true, () => api.gitPush(root));
+    await this.#run(`Pushing to ${this.remoteName}…`, true, () => api.gitPush(root), "push");
     return true;
   }
 
@@ -206,7 +208,7 @@ class GitState {
     if (!root || this.op) return;
     if (!(await this.#saveFirst())) return;
     try {
-      const r = await this.#run(`Getting changes from ${this.remoteName}…`, true, () => api.gitPull(root));
+      const r = await this.#run(`Getting changes from ${this.remoteName}…`, true, () => api.gitPull(root), "pull");
       if (r.updated) await this.#afterPull();
       if (r.conflicts.length) this.#conflictToast(r.conflicts);
       else toast({ kind: "success", source: "Git", title: r.updated ? "Got the latest changes" : "Already up to date" }, 2500);

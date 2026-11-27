@@ -1,18 +1,48 @@
 <script lang="ts">
+  import Files from "@lucide/svelte/icons/files";
   import { settings } from "../lib/settings.svelte";
   import { git } from "../lib/git.svelte";
   import { fmt } from "../lib/commands.svelte";
 
   const L = settings.layout;
+
+  // Push / pull in progress: dots flow along the branch (up = out, down = in).
+  const flow = $derived(git.op?.direction ?? null);
+
+  // More changed files than before: the badge hops once and the branch tip lights up.
+  // Not on the first status of a project, and not when the number goes down.
+  let pop = $state(0);
+  let prev: number | null = null;
+  $effect(() => {
+    const repo = git.status?.repo ?? false;
+    const n = git.changeCount;
+    if (!repo) {
+      prev = null;
+      return;
+    }
+    if (prev !== null && n > prev) pop++;
+    prev = n;
+  });
 </script>
 
 <div class="tabs" role="tablist" aria-label="Sidebar">
   <button role="tab" class="tab" class:active={L.side === "files"} aria-selected={L.side === "files"} title="Files ({fmt('Mod+B')} toggles the sidebar)" onclick={() => (L.side = "files")}>
+    <Files size={14} aria-hidden="true" />
     Files
   </button>
   <button role="tab" class="tab" class:active={L.side === "git"} aria-selected={L.side === "git"} title="Git: commit, push, pull ({fmt('Mod+Shift+G')})" onclick={() => (L.side = "git")}>
+    {#key pop}
+      <!-- Lucide's git-branch, inline so the tip and the branch line can be animated. -->
+      <svg class="branch" class:pop={pop > 0} class:flow={flow} class:pull={flow === "pull"} viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M15 6a9 9 0 0 0-9 9V3" />
+        <circle class="tip" cx="18" cy="6" r="3" />
+        <circle cx="6" cy="18" r="3" />
+      </svg>
+    {/key}
     Git
-    {#if git.changeCount > 0}<span class="badge" aria-label="{git.changeCount} changes">{git.changeCount > 99 ? "99+" : git.changeCount}</span>{/if}
+    {#if git.changeCount > 0}
+      {#key pop}<span class="badge" class:pop={pop > 0} aria-label="{git.changeCount} changes">{git.changeCount > 99 ? "99+" : git.changeCount}</span>{/key}
+    {/if}
   </button>
 </div>
 
@@ -49,6 +79,52 @@
   .tab.active {
     color: var(--text);
     border-bottom-color: var(--accent);
+  }
+  .tab :global(svg) {
+    flex: none;
+  }
+  /* Push / pull running */
+  .tab:has(.branch.flow) {
+    color: var(--accent);
+  }
+  .branch.flow path {
+    stroke-dasharray: 2.5 3.5;
+    animation: git-flow 0.7s linear infinite;
+  }
+  .branch.flow.pull path {
+    animation-direction: reverse;
+  }
+  @keyframes git-flow {
+    to {
+      stroke-dashoffset: -12;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* Only the colour shows that Git is busy. */
+    .branch.flow path {
+      stroke-dasharray: none;
+    }
+  }
+  /* New changes */
+  .branch.pop .tip {
+    animation: git-tip 1s ease-out;
+  }
+  @keyframes git-tip {
+    from {
+      fill: var(--accent);
+      stroke: var(--accent);
+    }
+    to {
+      fill: transparent;
+    }
+  }
+  .badge.pop {
+    animation: git-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1);
+  }
+  @keyframes git-pop {
+    40% {
+      transform: scale(1.35);
+    }
   }
   .badge {
     min-width: 16px;

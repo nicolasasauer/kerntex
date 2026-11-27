@@ -1,0 +1,59 @@
+name: Screenshots
+
+# Retakes the README and Store screenshots from the browser mock
+# (scripts/screenshots.mjs) and opens a pull request when they changed.
+# Runs after every release tag and on demand (Actions → Screenshots → Run workflow).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: screenshots
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # The UI uses Inter and JetBrains Mono when installed; same look as on a desktop.
+      - name: Fonts
+        run: sudo apt-get update && sudo apt-get install -y fonts-inter fonts-jetbrains-mono
+
+      - run: npm ci
+
+      - name: Playwright with Chromium
+        run: |
+          npm i --no-save playwright@1.49.1
+          npx playwright install --with-deps chromium
+
+      - name: Take screenshots
+        run: npm run screenshots
+
+      - name: Open a pull request if they changed
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/screenshots
+          commit-message: Refresh screenshots
+          title: Refresh screenshots
+          body: |
+            Screenshots retaken by the *Screenshots* workflow (`npm run screenshots`) for `docs/screenshots/` (README) and `docs/store/` (Microsoft Store).
+
+            Check them in the *Files changed* tab before merging.
+          add-paths: |
+            docs/screenshots/*.png
+            docs/store/*.png
+          delete-branch: true

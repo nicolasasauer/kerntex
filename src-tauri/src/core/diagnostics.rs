@@ -174,6 +174,133 @@ pub fn parse_tex_log(log: &str) -> Vec<Diagnostic> {
     finish(out)
 }
 
+/// TeX reports a missing package or class on the line it had read up to when
+/// it gave up, usually the one *after* `\usepackage{…}`. Point such errors at
+/// the package name in the `\usepackage` / `\documentclass` line instead, and
+/// select it. `read` returns the text of a project file; when the name can't be
+/// found there, TeX's line is kept.
+pub fn locate_missing_files(diags: &mut [Diagnostic], mut read: impl FnMut(&str) -> Option<String>) {
+    for d in diags.iter_mut() {
+        let Some(file) = d.file.clone() else { continue };
+        let Some((name, ext)) = missing_file_name(&d.message) else { continue };
+        let commands: &[&str] = match ext {
+            "sty" => &["\\usepackage", "\\RequirePackage", "\\RequirePackageWithOptions"],
+            "cls" => &["\\documentclass", "\\LoadClass", "\\LoadClassWithOptions"],
+            _ => continue,
+        };
+        let Some(text) = read(&file) else { continue };
+        if let Some((line, column, end_column)) = find_loaded_name(&text, commands, name) {
+            d.line = Some(line);
+            d.column = Some(column);
+            d.end_line = Some(line);
+            d.end_column = Some(end_column);
+            // The "near …" snippet showed TeX's line, which is no longer the one meant.
+            if let Some(idx) = d.message.find(" — near “") {
+                d.message.truncate(idx);
+            }
+        }
+    }
+}
+
+/// ``File `foo.sty' not found`` → ("foo", "sty").
+fn missing_file_name(msg: &str) -> Option<(&str, &str)> {
+    let start = msg.find("File `").or_else(|| msg.find("file `"))? + 6;
+    let rest = &msg[start..];
+    let end = rest.find('\'')?;
+    if !rest[end..].contains("not found") {
+        return None;
+    }
+    let (name, ext) = rest[..end].rsplit_once('.')?;
+    (!name.is_empty()).then_some((name, ext))
+}
+
+/// Finds `name` in the braced list of the first matching load command
+/// (`\usepackage[opts]{a, name, b}`), ignoring comments. Returns the 1-based
+/// line and the start/end columns (UTF-16, as the editor counts them).
+fn find_loaded_name(text: &str, commands: &[&str], name: &str) -> Option<(u32, u32, u32)> {
+    // Blank out comments so `% \usepackage{x}` doesn't count; byte positions stay.
+    let mut code = text.as_bytes().to_vec();
+    let mut i = 0;
+    while i < code.len() {
+        if code[i] == b'%' && code[..i].iter().rev().take_while(|&&b| b == b'\\').count() % 2 == 0 {
+            while i < code.len() && code[i] != b'\n' {
+                code[i] = b' ';
+                i += 1;
+            }
+        }
+        i += 1;
+    }
+    let mut best: Option<usize> = None;
+    for cmd in commands {
+        let cmd = cmd.as_bytes();
+        let mut from = 0;
+        while let Some(pos) = find_bytes(&code[from..], cmd).map(|p| p + from) {
+            from = pos + cmd.len();
+            if code.get(from).is_some_and(|b| b.is_ascii_alphabetic()) {
+                continue; // a longer command name, e.g. \usepackagex
+            }
+            if let Some(at) = name_in_args(&code, from, name.as_bytes()) {
+                if best.is_none_or(|b| at < b) {
+                    best = Some(at);
+                }
+                break;
+            }
+        }
+    }
+    let at = best?;
+    let line_start = text[..at].rfind('\n').map_or(0, |p| p + 1);
+    let line = text[..at].matches('\n').count() as u32 + 1;
+    let column = text[line_start..at].encode_utf16().count() as u32 + 1;
+    Some((line, column, column + name.encode_utf16().count() as u32))
+}
+
+/// After a command name: skips `[…]` and returns the byte offset of `name` in
+/// the following `{…}` list.
+fn name_in_args(code: &[u8], mut i: usize, name: &[u8]) -> Option<usize> {
+    let skip_ws = |i: &mut usize| {
+        while code.get(*i).is_some_and(|b| b.is_ascii_whitespace()) {
+            *i += 1;
+        }
+    };
+    skip_ws(&mut i);
+    if code.get(i) == Some(&b'[') {
+        let mut depth = 0;
+        while i < code.len() {
+            match code[i] {
+                b'[' => depth += 1,
+                b']' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        i += 1;
+        skip_ws(&mut i);
+    }
+    if code.get(i) != Some(&b'{') {
+        return None;
+    }
+    let close = i + code[i..].iter().position(|&b| b == b'}')?;
+    let mut item = i + 1;
+    for part in code[i + 1..close].split(|&b| b == b',') {
+        let lead = part.iter().take_while(|b| b.is_ascii_whitespace()).count();
+        let trimmed = part[lead..].trim_ascii_end();
+        if trimmed == name {
+            return Some(item + lead);
+        }
+        item += part.len() + 1;
+    }
+    None
+}
+
+fn find_bytes(hay: &[u8], needle: &[u8]) -> Option<usize> {
+    hay.windows(needle.len()).position(|w| w == needle)
+}
+
 /// BibTeX `.blg` / Biber output: surfaces missing entries and syntax errors.
 pub fn parse_bib_log(log: &str, biber: bool) -> Vec<Diagnostic> {
     let src = if biber { "Biber" } else { "BibTeX" };
@@ -587,5 +714,34 @@ mod tests {
         assert_eq!(d.len(), 1, "{d:?}");
         assert_eq!(d[0].severity, Severity::Info);
         assert!(d[0].hint.as_deref().is_some_and(|h| h.contains("Biber")), "{d:?}");
+    }
+
+    #[test]
+    fn missing_package_points_at_usepackage() {
+        // Same real log as above: TeX reports l.3, the package is loaded on line 2.
+        let log = "(./main.tex\nLaTeX2e <2023-11-01>\n! LaTeX Error: File `nonexistentpkg.sty' not found.\n\nType X to quit or <RETURN> to proceed,\nor enter new name. (Default extension: sty)\n\nEnter file name: \n./main.tex:3: Emergency stop.\n<read *> \n         \nl.3 \\begin\n             {document}\n*** (cannot \\read from terminal in nonstop modes)\n\n./main.tex:3:  ==> Fatal error occurred, no output PDF file produced!\n";
+        let mut d = parse_tex_log(log);
+        let src = "\\documentclass{article}\n\\usepackage{nonexistentpkg}\n\\begin{document}\nHi\n\\end{document}\n";
+        locate_missing_files(&mut d, |f| (f == "main.tex").then(|| src.to_string()));
+        assert_eq!((d[0].line, d[0].column, d[0].end_column), (Some(2), Some(13), Some(27)), "{d:?}");
+    }
+
+    #[test]
+    fn missing_package_tectonic_and_lists() {
+        let mut d = parse_tectonic("error: main.tex:5: LaTeX Error: File `foobar.sty' not found.\n");
+        let src = "\\documentclass{article}\n% \\usepackage{foobar}\n\\usepackage[utf8]{inputenc}\n\\usepackage[a, b=[c]]{amsmath,\n  foobar , graphicx}\n\\begin{document}\n";
+        locate_missing_files(&mut d, |_| Some(src.to_string()));
+        assert_eq!((d[0].line, d[0].column, d[0].end_column), (Some(5), Some(3), Some(9)), "{d:?}");
+    }
+
+    #[test]
+    fn missing_class_and_fallback() {
+        let mut d = parse_tectonic("error: main.tex:1: LaTeX Error: File `fancyclass.cls' not found.\n");
+        locate_missing_files(&mut d, |_| Some("ä \\documentclass[12pt]{fancyclass}\n".into()));
+        assert_eq!((d[0].line, d[0].column), (Some(1), Some(24)));
+        // Not loaded in that file (e.g. a nested \input): TeX's line stays.
+        let mut d = parse_tectonic("error: main.tex:7: LaTeX Error: File `other.sty' not found.\n");
+        locate_missing_files(&mut d, |_| Some("\\usepackage{otherx}\n\\usepackagex{other}\n".into()));
+        assert_eq!((d[0].line, d[0].column), (Some(7), None));
     }
 }

@@ -24,6 +24,8 @@ export type CompileStatus =
   | { state: "running"; stage: string; detail: string | null; startedAt: number; firstRun: boolean }
   | { state: "done"; result: CompileResult };
 
+/** Builds faster than this keep compiling on every autosave (setting "fast"). */
+const FAST_BUILD_MS = 5000;
 const TEXT_EXT = /\.(tex|typ|bib|sty|cls|txt|md|bbx|cbx|dtx|ins|ltx|cfg|def|bst|latexmkrc|tikz|csv|dat|json|yaml|yml|lua|py|r|m|gitignore)$/i;
 
 const PREVIEW_EXT = /\.(png|jpe?g|gif|svg|webp|bmp|pdf)$/i;
@@ -60,6 +62,10 @@ class Workspace {
   lastTextTab: string | null = null;
 
   #pendingCompile = false;
+  /** Duration of the last successful and of the last finished build (ms), for auto-compile. */
+  #lastOkBuildMs: number | null = null;
+  #lastBuildMs: number | null = null;
+  #toldAutoCompilePaused = false;
   #autosaveTimer: ReturnType<typeof setTimeout> | undefined;
   #unlisten: (() => void) | null = null;
 
@@ -101,6 +107,8 @@ class Workspace {
       const info = await api.openProject(root);
       this.closeAllTabs();
       this.project = info;
+      this.#lastOkBuildMs = this.#lastBuildMs = null;
+      this.#toldAutoCompilePaused = false;
       this.diagnostics = [];
       this.log = "";
       this.status = { state: "idle" };
@@ -285,7 +293,7 @@ class Workspace {
 
   // ---------- Files & tabs ----------
 
-  async openFile(path: string, line?: number) {
+  async openFile(path: string, line?: number, column?: number, endColumn?: number) {
     const p = this.project;
     if (!p) return;
     if (isPreviewable(path)) {
@@ -315,7 +323,7 @@ class Workspace {
     }
     this.lastTextTab = path;
     this.active = path;
-    if (line) queueMicrotask(() => this.editor?.gotoLine(line));
+    if (line) queueMicrotask(() => this.editor?.gotoLine(line, column, endColumn));
   }
 
   activate(path: string) {
@@ -356,8 +364,27 @@ class Workspace {
     tab.dirty = text !== tab.saved;
     if (settings.autosave && tab.dirty) {
       clearTimeout(this.#autosaveTimer);
-      this.#autosaveTimer = setTimeout(() => this.save({ compile: settings.compileOnSave, quiet: true }), settings.autosaveDelayMs);
+      this.#autosaveTimer = setTimeout(() => this.save({ compile: this.#autosaveShouldCompile(), quiet: true }), settings.autosaveDelayMs);
     }
+  }
+
+  /** Quick documents compile on every autosave (feels live); long builds only on
+   *  Ctrl+S or Compile, so the engine doesn't run all the time. */
+  #autosaveShouldCompile(): boolean {
+    if (!settings.compileOnSave || settings.autoCompile === "off") return false;
+    if (settings.autoCompile === "always") return true;
+    const last = this.#lastOkBuildMs ?? this.#lastBuildMs;
+    if (last == null || last < FAST_BUILD_MS) return true;
+    if (!this.#toldAutoCompilePaused) {
+      this.#toldAutoCompilePaused = true;
+      toast({
+        kind: "info",
+        source: "KernTeX",
+        title: "Saved without compiling",
+        body: `This document takes ${Math.round(last / 1000)} s to build, so autosave doesn't compile it. Press Ctrl+S or Compile to update the PDF (Settings → Compiling).`,
+      });
+    }
+    return false;
   }
 
   async saveFile(path: string): Promise<boolean> {
@@ -588,6 +615,8 @@ class Workspace {
       this.status = { state: "done", result };
       this.log = result.log;
       if (!result.canceled) {
+        this.#lastBuildMs = result.durationMs;
+        if (result.ok) this.#lastOkBuildMs = result.durationMs;
         this.diagnostics = result.diagnostics;
         if (result.pdfPath) this.pdfVersion++;
         const errors = result.diagnostics.filter((d) => d.severity === "error").length;
@@ -621,7 +650,9 @@ class Workspace {
 
   async gotoDiagnostic(d: Diagnostic) {
     if (!d.file) return;
-    await this.openFile(d.file, d.line ?? undefined);
+    // Select the exact range when it's on one line (e.g. a missing package's name).
+    const sameLine = !d.endLine || d.endLine === d.line;
+    await this.openFile(d.file, d.line ?? undefined, d.column, sameLine ? d.endColumn : undefined);
   }
 }
 
