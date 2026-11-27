@@ -350,6 +350,8 @@ pub fn compile(req: &CompileRequest, cancel: &CancelHandle, mut on_progress: imp
         }
     }
 
+    diagnostics::locate_missing_files(&mut diags, |f| project::read_text(&root, f).ok());
+
     let has_errors = diags.iter().any(|d| d.severity == Severity::Error);
     if !status.success() && !has_errors {
         // The engine failed but we couldn't pinpoint why: say so honestly.
