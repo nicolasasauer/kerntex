@@ -50,9 +50,15 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # A release published straight from the GitHub UI starts this before release.yml
+        # has built the MSIX, so wait for it (up to an hour).
         run: |
           mkdir msix
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.msix' --dir msix
+          for i in $(seq 1 60); do
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.msix' --dir msix --clobber 2>/dev/null && break
+            echo "No .msix on $TAG yet, waiting… ($i/60)"
+            sleep 60
+          done
           ls -l msix
           [ "$(ls msix/*.msix | wc -l)" -eq 1 ] || { echo "::error::Expected exactly one .msix on release $TAG"; exit 1; }
 
