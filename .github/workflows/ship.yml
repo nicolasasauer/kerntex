@@ -1,0 +1,107 @@
+name: Ship release
+
+# One click: bump the version on main, tag it, build all installers, publish the
+# release and submit it to the Microsoft Store.
+# Actions → Ship release → Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Which part of the version to raise"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      version:
+        description: "Or an exact version (e.g. 1.0.0); overrides the choice above"
+        required: false
+      publish:
+        description: "Publish the release and submit to the Store (off = stop at a draft release)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ship
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump version and tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Next version
+        id: tag
+        env:
+          BUMP: ${{ inputs.bump }}
+          EXACT: ${{ inputs.version }}
+        run: |
+          current=$(node -p "require('./package.json').version")
+          if [ -n "$EXACT" ]; then
+            next="${EXACT#v}"
+          else
+            next=$(node -e '
+              const [maj, min, pat] = process.argv[1].split("-")[0].split(".").map(Number);
+              const b = process.argv[2];
+              console.log(b === "major" ? `${maj + 1}.0.0` : b === "minor" ? `${maj}.${min + 1}.0` : `${maj}.${min}.${pat + 1}`);
+            ' "$current" "$BUMP")
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$next" >/dev/null; then
+            echo "::error::Tag v$next exists already."
+            exit 1
+          fi
+          echo "Releasing $current → $next" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "tag=v$next" >> "$GITHUB_OUTPUT"
+
+      - name: Commit, tag and push
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          node scripts/version.mjs "$VERSION"
+          node scripts/version.mjs --check "$TAG"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Release $VERSION"
+          git tag "$TAG"
+          # Both or neither, so main never says a version that has no tag.
+          git push --atomic origin HEAD:main "refs/tags/$TAG"
+
+  build:
+    needs: bump
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.bump.outputs.tag }}
+    secrets: inherit
+
+  publish:
+    name: Publish release
+    needs: [bump, build]
+    if: inputs.publish
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.bump.outputs.tag }}
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
+  # Publishing with the workflow's own token doesn't start store.yml by itself, so call it here.
+  store:
+    needs: [bump, publish]
+    uses: ./.github/workflows/store.yml
+    with:
+      tag: ${{ needs.bump.outputs.tag }}
+      commit: true
+    secrets: inherit

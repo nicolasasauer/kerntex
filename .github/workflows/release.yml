@@ -5,9 +5,19 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+  # Called by ship.yml (one-click release) with the tag it just pushed.
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
 
 permissions:
   contents: write
+
+env:
+  # The release tag: from ship.yml, or the pushed tag; empty for a plain manual build.
+  TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
 
 jobs:
   build:
@@ -21,11 +31,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || '' }}
 
       # Installer names and the app's own version come from the project files, not from the tag.
       - name: Tag matches the project version
-        if: github.ref_type == 'tag'
-        run: node scripts/version.mjs --check "${{ github.ref_name }}"
+        if: env.TAG != ''
+        run: node scripts/version.mjs --check "${{ env.TAG }}"
 
       - name: Linux system packages
         if: runner.os == 'Linux'
@@ -58,8 +70,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-          releaseName: KernTeX ${{ github.ref_name }}
+          tagName: ${{ env.TAG }}
+          releaseName: KernTeX ${{ env.TAG || github.ref_name }}
           releaseBody: |
             Download the installer for your system below. Tectonic is included — no TeX installation needed.
 
@@ -86,11 +98,11 @@ jobs:
           path: ${{ steps.msix.outputs.msix }}
 
       - name: Attach the MSIX to the release
-        if: runner.os == 'Windows' && github.ref_type == 'tag'
+        if: runner.os == 'Windows' && env.TAG != ''
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.ref_name }}" "${{ steps.msix.outputs.msix }}" --clobber
+        run: gh release upload "$TAG" "${{ steps.msix.outputs.msix }}" --clobber
 
       - name: Installer sizes
         shell: bash

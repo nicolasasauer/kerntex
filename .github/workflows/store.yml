@@ -1,0 +1,97 @@
+name: Microsoft Store
+
+# Submits the MSIX of a published GitHub release to Partner Center.
+# Runs when you publish the draft release that release.yml created, or by hand.
+# Setup (one time) is described in docs/microsoft-store.md → "Automatic submission".
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag whose .msix to submit (e.g. v0.1.8)"
+        required: true
+      commit:
+        description: "Submit for certification (off = upload only, review the draft in Partner Center)"
+        type: boolean
+        default: false
+  # Called by ship.yml (one-click release) after it published the release.
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      commit:
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: msstore
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: windows-latest
+    environment: microsoft-store
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Check configuration
+        shell: bash
+        env:
+          PRODUCT_ID: ${{ vars.MSSTORE_PRODUCT_ID }}
+          TENANT: ${{ secrets.AZURE_AD_TENANT_ID }}
+          CLIENT: ${{ secrets.AZURE_AD_CLIENT_ID }}
+          SECRET: ${{ secrets.AZURE_AD_CLIENT_SECRET }}
+          SELLER: ${{ secrets.SELLER_ID }}
+        run: |
+          missing=""
+          for v in PRODUCT_ID TENANT CLIENT SECRET SELLER; do [ -n "${!v}" ] || missing="$missing $v"; done
+          if [ -n "$missing" ]; then
+            echo "::error::Store submission isn't configured (missing:$missing). See docs/microsoft-store.md."
+            exit 1
+          fi
+
+      - name: Download the MSIX from the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # A release published straight from the GitHub UI starts this before release.yml
+        # has built the MSIX, so wait for it (up to an hour).
+        run: |
+          mkdir msix
+          for i in $(seq 1 60); do
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.msix' --dir msix --clobber 2>/dev/null && break
+            echo "No .msix on $TAG yet, waiting… ($i/60)"
+            sleep 60
+          done
+          ls -l msix
+          [ "$(ls msix/*.msix | wc -l)" -eq 1 ] || { echo "::error::Expected exactly one .msix on release $TAG"; exit 1; }
+
+      - uses: microsoft/setup-msstore-cli@v1
+
+      - name: Sign in to Partner Center
+        shell: pwsh
+        run: >
+          msstore reconfigure
+          --tenantId "${{ secrets.AZURE_AD_TENANT_ID }}"
+          --clientId "${{ secrets.AZURE_AD_CLIENT_ID }}"
+          --clientSecret "${{ secrets.AZURE_AD_CLIENT_SECRET }}"
+          --sellerId "${{ secrets.SELLER_ID }}"
+
+      - name: Submit
+        shell: pwsh
+        env:
+          PRODUCT_ID: ${{ vars.MSSTORE_PRODUCT_ID }}
+          # Releases always go to certification; a manual run only does so when asked.
+          COMMIT: ${{ github.event_name == 'release' || inputs.commit }}
+        run: |
+          $msix = (Get-ChildItem msix/*.msix).FullName
+          $extra = @()
+          if ($env:COMMIT -ne 'true') { $extra += '--noCommit' }
+          msstore publish $msix --appId $env:PRODUCT_ID @extra
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "Submitted ``$(Split-Path $msix -Leaf)`` (commit: $env:COMMIT)" >> $env:GITHUB_STEP_SUMMARY
