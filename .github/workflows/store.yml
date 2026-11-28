@@ -39,6 +39,8 @@ jobs:
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
+      - uses: actions/checkout@v4 # first: it empties the folder
+
       - name: Check configuration
         shell: bash
         env:
@@ -82,16 +84,28 @@ jobs:
           --clientSecret "${{ secrets.AZURE_AD_CLIENT_SECRET }}"
           --sellerId "${{ secrets.SELLER_ID }}"
 
-      - name: Submit
+      - name: Upload the package
         shell: pwsh
         env:
           PRODUCT_ID: ${{ vars.MSSTORE_PRODUCT_ID }}
+        run: |
+          $msix = (Get-ChildItem msix/*.msix).FullName
+          msstore publish $msix --appId $env:PRODUCT_ID --noCommit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: What's new, then submit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          AZURE_AD_TENANT_ID: ${{ secrets.AZURE_AD_TENANT_ID }}
+          AZURE_AD_CLIENT_ID: ${{ secrets.AZURE_AD_CLIENT_ID }}
+          AZURE_AD_CLIENT_SECRET: ${{ secrets.AZURE_AD_CLIENT_SECRET }}
+          MSSTORE_PRODUCT_ID: ${{ vars.MSSTORE_PRODUCT_ID }}
           # Releases always go to certification; a manual run only does so when asked.
           COMMIT: ${{ github.event_name == 'release' || inputs.commit }}
         run: |
-          $msix = (Get-ChildItem msix/*.msix).FullName
-          $extra = @()
-          if ($env:COMMIT -ne 'true') { $extra += '--noCommit' }
-          msstore publish $msix --appId $env:PRODUCT_ID @extra
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          "Submitted ``$(Split-Path $msix -Leaf)`` (commit: $env:COMMIT)" >> $env:GITHUB_STEP_SUMMARY
+          flag=""
+          [ "$COMMIT" = "true" ] && flag="--commit"
+          node scripts/release-notes.mjs store "$TAG" $flag
+          echo "Submitted the .msix of $TAG (commit: $COMMIT)" >> "$GITHUB_STEP_SUMMARY"

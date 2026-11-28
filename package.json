@@ -12,7 +12,7 @@
     "tauri": "tauri",
     "setup:tectonic": "node scripts/fetch-tectonic.mjs",
     "build:mcp": "node scripts/build-mcp-proxy.mjs",
-    "test:scripts": "node --test scripts/fetch-tectonic.test.mjs scripts/build-msix.test.mjs scripts/build-mcp-proxy.test.mjs scripts/version.test.mjs",
+    "test:scripts": "node --test scripts/fetch-tectonic.test.mjs scripts/build-msix.test.mjs scripts/build-mcp-proxy.test.mjs scripts/version.test.mjs scripts/release-notes.test.mjs",
     "version:set": "node scripts/version.mjs",
     "build:msix": "node scripts/build-msix.mjs",
     "screenshots": "node scripts/screenshots.mjs"

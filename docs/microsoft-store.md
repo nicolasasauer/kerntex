@@ -54,6 +54,8 @@ One-time setup:
 
 5. Dry run: *Actions → Microsoft Store → Run workflow* with a released tag and *commit* off. That uploads the package into a draft submission without sending it to certification; check it in Partner Center and delete it or submit it there.
 
+**What's new in this version:** each release body starts with a *What's new* section listing the commits since the previous tag. Edit it in the draft release before publishing if you like; the Store gets that section as plain text (all languages, at most 1500 characters). A release without the section keeps the Store's previous text, and if setting it fails, the update is submitted anyway (with a warning in the run).
+
 Only one submission can be in progress at a time: if the previous one is still in certification, the run fails and can be re-run later. Updates via the CLI work for free products only (KernTeX is free).
 
 ## Things to know
