@@ -33,6 +33,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || '' }}
+          fetch-depth: 0 # tags and history, for "What's new"
 
       # Installer names and the app's own version come from the project files, not from the tag.
       - name: Tag matches the project version
@@ -66,6 +67,19 @@ jobs:
       - name: Build kerntex-mcp (lets AI assistants connect)
         run: npm run build:mcp
 
+      # Commits since the previous tag; edit them in the draft release before publishing,
+      # the Store gets the same text ("What's new in this version").
+      - name: What's new
+        id: notes
+        if: env.TAG != ''
+        shell: bash
+        run: |
+          {
+            echo 'notes<<NOTES_EOF'
+            node scripts/release-notes.mjs from-git "$TAG"
+            echo 'NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -73,6 +87,12 @@ jobs:
           tagName: ${{ env.TAG }}
           releaseName: KernTeX ${{ env.TAG || github.ref_name }}
           releaseBody: |
+            ## What's new
+
+            ${{ steps.notes.outputs.notes }}
+
+            ## Download
+
             Download the installer for your system below. Tectonic is included — no TeX installation needed.
 
             **Windows:** `KernTeX_*_x64-setup.exe` (or the `.msi`). SmartScreen may warn because the installer isn't code-signed yet: click “More info” → “Run anyway”.
