@@ -23,6 +23,10 @@ Without these variables the workflow still builds an MSIX (with a placeholder id
 
 ## Each release
 
+**One click:** *Actions → Ship release → Run workflow* (choose patch / minor / major, or type an exact version). It raises the version on `main`, tags it, builds every installer, publishes the release and submits the `.msix` to the Store. Turn *publish* off to stop at a draft release you check first. If `main` requires pull requests, allow GitHub Actions to bypass that rule (*Settings → Rules*), or use the manual steps below.
+
+By hand:
+
 1. Run `npm run version:set -- X.Y.Z` (updates every file that states the version); merge to `main`.
 2. Push the tag `vX.Y.Z` (or publish a GitHub release with that new tag; the Store submission then waits until the `.msix` is attached). The workflow stops if the tag and the project version differ; otherwise it builds everything and attaches the `.msix`.
 3. Publish the draft release. With [automatic submission](#automatic-submission-cd) set up, the `.msix` goes to the Store by itself; otherwise in Partner Center → *New submission* → *Packages*: upload the `.msix`. The Store requires each version to be higher than the last; the fourth number is always `0`.
