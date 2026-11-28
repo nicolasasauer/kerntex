@@ -25,9 +25,32 @@ Without these variables the workflow still builds an MSIX (with a placeholder id
 
 1. Run `npm run version:set -- X.Y.Z` (updates every file that states the version); merge to `main`.
 2. Publish a GitHub release with a new tag `vX.Y.Z` (or push the tag). The workflow stops if the tag and the project version differ; otherwise it builds everything and attaches the `.msix`.
-3. In Partner Center → *New submission* → *Packages*: upload the `.msix`. The Store requires each version to be higher than the last; the fourth number is always `0`.
+3. Publish the draft release. With [automatic submission](#automatic-submission-cd) set up, the `.msix` goes to the Store by itself; otherwise in Partner Center → *New submission* → *Packages*: upload the `.msix`. The Store requires each version to be higher than the last; the fourth number is always `0`.
 4. Store listing (first time): all texts (English and German), answers for the age rating, properties and the certification notes are in [store-listing.md](store-listing.md); screenshots (1920×1080) in `docs/store/`; privacy policy in [PRIVACY.md](../PRIVACY.md).
 5. Age rating questionnaire, pricing (free), submit.
+
+## Automatic submission (CD)
+
+Once the **first** submission has gone through by hand (Partner Center needs the listing, age rating and pricing once), `.github/workflows/store.yml` takes over step 3: when you **publish** the draft release, it downloads the `.msix` from that release and submits it to the Store with the [Microsoft Store Developer CLI](https://learn.microsoft.com/windows/apps/publish/msstore-dev-cli/overview). Listing texts and screenshots are kept from the previous submission.
+
+One-time setup:
+
+1. **Entra ID app** (lets the workflow sign in): Partner Center → ⚙️ *Account settings* → *User management* → *Microsoft Entra applications* → **Create Azure AD application** (role *Manager*). Note the *Tenant ID* and *Client ID*, then *Add new key* and copy the secret (shown once; it expires, renew it before then).
+2. **Seller ID**: Partner Center → *Account settings* → *Legal info* → *Developer* → *Seller ID*.
+3. **Product ID**: the 12-character Store ID of KernTeX (*Product management → Product identity*, e.g. `9NXXXXXXXXXX`).
+4. In GitHub, *Settings → Environments* → create **`microsoft-store`** (optionally with yourself as required reviewer, so each submission waits for a click) and add:
+
+   | Kind | Name | Value |
+   | --- | --- | --- |
+   | Secret | `AZURE_AD_TENANT_ID` | Tenant ID |
+   | Secret | `AZURE_AD_CLIENT_ID` | Client ID |
+   | Secret | `AZURE_AD_CLIENT_SECRET` | the key from step 1 |
+   | Secret | `SELLER_ID` | Seller ID |
+   | Variable | `MSSTORE_PRODUCT_ID` | Product ID |
+
+5. Dry run: *Actions → Microsoft Store → Run workflow* with a released tag and *commit* off. That uploads the package into a draft submission without sending it to certification; check it in Partner Center and delete it or submit it there.
+
+Only one submission can be in progress at a time: if the previous one is still in certification, the run fails and can be re-run later. Updates via the CLI work for free products only (KernTeX is free).
 
 ## Things to know
 
